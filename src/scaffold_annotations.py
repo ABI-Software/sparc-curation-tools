@@ -6,7 +6,7 @@ import pandas as pd
 from pathlib import Path
 import re
 
-__version__ = '1.0.0'
+VERSION = '1.1.0'
 
 
 SCAFFOLD_DIR_MIME = 'inode/vnd.abi.scaffold+directory'
@@ -36,7 +36,7 @@ class ScaffoldAnnotation(object):
 
     def location(self):
         post_fix = list(filter(None, [self._dir, self._file, self._thumbnail]))
-        return os.path.join(self._location, post_fix[0])
+        return os.path.normpath(os.path.join(self._location, post_fix[0]))
 
     def set_dir(self, dir_name):
         self._dir = dir_name
