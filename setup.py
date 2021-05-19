@@ -38,8 +38,8 @@ setup(
     package_dir={"": "src"},
     entry_points={
         "console_scripts": [
-            "scaffold-annotations = scaffold_annotations:main",
-            "plot-annotation = plot_annotation:main"
+            "scaffold-annotations = sparc.curation.tools.scaffold_annotations:main",
+            "plot-annotation = sparc.curation.tools.plot_annotation:main"
         ]
     },
     include_package_data=True,
