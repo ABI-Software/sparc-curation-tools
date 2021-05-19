@@ -18,13 +18,14 @@ readme.append('::')
 readme.append('')
 readme.append('')
 
-software_licence = readfile("LICENSE")
+software_licence = readfile("LICENSE", True)
+software_licence = '\n  '.join(software_licence)
 
 requires = ['pandas', 'openpyxl']
 
 setup(
     name='sparc-curation-tools',
-    version='0.1.0.dev2',
+    version='0.1.0.dev3',
     description='A collection of tools to help with curating SPARC datasets..',
     long_description='\n'.join(readme) + software_licence,
     long_description_content_type='text/x-rst',
