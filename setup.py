@@ -24,7 +24,7 @@ requires = ['pandas', 'openpyxl']
 
 setup(
     name='sparc-curation-tools',
-    version='0.1.0.dev1',
+    version='0.1.0.dev2',
     description='A collection of tools to help with curating SPARC datasets..',
     long_description='\n'.join(readme) + software_licence,
     long_description_content_type='text/x-rst',
