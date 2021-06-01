@@ -2,7 +2,7 @@ import re
 import argparse
 import json
 
-VERSION = '1.1.0'
+VERSION = '1.2.0'
 AVAILABLE_PLOT_TYPES = ['heatmap', 'timeseries']
 AVAILABLE_DELIMITERS = ['tab', 'comma']
 
@@ -45,6 +45,8 @@ def main():
                         default=[], nargs='*', action="append", type=parse_num_list)
     parser.add_argument("-n", "--no-header", help="Boolean to indicate whether a header line is missing. Default is False.",
                         action="store_true", default=False)
+    parser.add_argument("-r", "--row-major", help="Boolean to indicate whether the data is row major or column major. Default is False.",
+                        action="store_true", default=False)
     parser.add_argument("-d", "--delimiter", help="The type of delimiter used, must be one of; " + ", ".join(AVAILABLE_DELIMITERS) + ". Default is comma.",
                         default='comma', choices=AVAILABLE_DELIMITERS)
 
@@ -63,6 +65,9 @@ def main():
 
     if args.no_header:
         attrs['no-header'] = args.no_header
+
+    if args.row_major:
+        attrs['row-major'] = args.row_major
 
     data = {
         'version': VERSION,
