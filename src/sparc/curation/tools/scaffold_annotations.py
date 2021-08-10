@@ -19,8 +19,12 @@ SIZE_NAME = ("B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB")
 
 class ScaffoldAnnotationError(object):
 
-    def __init__(self, message):
+    def __init__(self, message, location):
         self._message = message
+        self._location = location
+    
+    def getLocation(self):
+        return self._location
 
     def __str__(self):
         return f'Error: {self._message}'
@@ -79,32 +83,40 @@ def something(base_dir, filename, mime):
             value.set_file(filename)
         elif mime == SCAFFOLD_THUMBNAIL_MIME:
             value.set_thumbnail(filename)
-
+        if not value.file():
+            value = None
     return value
 
 
-def scrape_manifest_content(manifest, data_frame):
-    base_dir = os.path.dirname(manifest)
+def scrape_manifest_content(data_frame):
     manifest_annotations = []
-    for key in data_frame.keys():
-        df = data_frame[key]
-        if 'additional types' in df:
-            full_results = [something(base_dir, x, y) for x, y in zip(df['filename'], df['additional types'])]
-            result = list(filter(None, full_results))
-            manifest_annotations.extend(result)
-
+    df = data_frame
+    if 'additional types' in df:
+        full_results = [something(df['manifest_dir'],df['filename'], df['additional types']) for index, df in data_frame.iterrows()]
+        result = list(filter(None, full_results))
+        manifest_annotations.extend(result)
     return manifest_annotations
 
 
-def scrape_manifest_entries(dataset_dir):
+def read_manifest(dataset_dir):
     result = list(Path(dataset_dir).rglob("manifest.xlsx"))
-    scaffold_annotations = []
+    manifestDataFrame = pd.DataFrame()
     for r in result:
         xl_file = pd.ExcelFile(r)
-        dfs = {sheet_name: xl_file.parse(sheet_name)
-               for sheet_name in xl_file.sheet_names}
-        scaffold_annotations.extend(scrape_manifest_content(r, dfs))
+        # print(xl_file)
+        for sheet_name in xl_file.sheet_names:
+            currentDataFrame = xl_file.parse(sheet_name)
+            currentDataFrame['sheet_name'] =sheet_name
+            currentDataFrame['manifest_dir'] =os.path.dirname(r)
+            manifestDataFrame = pd.concat([currentDataFrame,manifestDataFrame])
+    # print(manifestDataFrame)
+    return manifestDataFrame
 
+
+def scrape_manifest_entries(dataset_dir):
+    scaffold_annotations = []
+    dfs = read_manifest(dataset_dir)
+    scaffold_annotations.extend(scrape_manifest_content(dfs))
     return scaffold_annotations
 
 
@@ -114,10 +126,9 @@ def check_scaffold_annotations(scaffold_annotations):
         location = scaffold_annotation.location()
         if scaffold_annotation.is_dir():
             if not os.path.isdir(location):
-                errors.append(ScaffoldAnnotationError(f'Directory "{location}" either does not exist or is not a directory.'))
+                errors.append(ScaffoldAnnotationError(f'Directory "{location}" either does not exist or is not a directory.', location))
         elif not os.path.isfile(location):
-            errors.append(ScaffoldAnnotationError(f'File "{location}" does not exist.'))
-
+            errors.append(ScaffoldAnnotationError(f'File "{location}" does not exist.', location))
     return errors
 
 
@@ -126,7 +137,7 @@ def search_for_metadata_files(dataset_dir, max_size):
     result = list(Path(dataset_dir).rglob("*"))
     for r in result:
         meta = False
-        if os.path.getsize(r) < max_size:
+        if os.path.getsize(r) < max_size and os.path.isfile(r):
             try:
                 with open(r, encoding='utf-8') as f:
                     file_data = f.read()
@@ -158,9 +169,24 @@ def check_scaffold_metadata_annotated(metadata, annotations):
     errors = []
     for md in metadata:
         if md not in annotations:
-            errors.append(ScaffoldAnnotationError(f"Found scaffold metadata file that is not annotated '{md.location()}'."))
+            errors.append(ScaffoldAnnotationError(f"Found scaffold metadata file that is not annotated '{md.location()}'.", md.location()))
     return errors
 
+def annotate_scaffold_file(dataset_dir, file_location):
+    manifestDataFrame = read_manifest(dataset_dir)
+    fileDF = manifestDataFrame[manifestDataFrame["filename"] == os.path.basename(file_location)]
+    # If fileDF is empty, means there's no manifest file contain this file. 
+    # Check if there's manifest file under same dir. Add file to the manifest.
+    # If no manifest file create new manifest file
+    # Todo
+    print(fileDF)
+    
+    for index, row in fileDF.iterrows():
+        fileLocation = os.path.join(row["manifest_dir"], row['filename'])
+        if os.path.samefile(file_location, fileLocation):
+            mDF = pd.read_excel(os.path.join(row["manifest_dir"],"manifest.xlsx"),sheet_name=row["sheet_name"])
+            mDF['additional types'][mDF["filename"] == row['filename']] = SCAFFOLD_FILE_MIME
+            mDF.to_excel(os.path.join(row["manifest_dir"],"manifest.xlsx"), sheet_name=row["sheet_name"], index=False, header=True)
 
 def convert_size(size_bytes):
     if size_bytes == 0:
@@ -185,15 +211,19 @@ def main():
     parser.add_argument("dataset_dir", help='directory to check.')
     parser.add_argument("-m", "--max-size", help="Set the max size for metadata file. Default is 2MiB", default='2MiB', type=convert_to_bytes)
 
-    args = parser.parse_args()
-    scaffold_annotations = scrape_manifest_entries(args.dataset_dir)
+    # args = parser.parse_args()
+    dataset_dir = r"C:\Users\ywan787\neondata\curationdata"
+    max_size = 1000000000
+    scaffold_annotations = scrape_manifest_entries(dataset_dir)
+    read_manifest(dataset_dir)
     errors = check_scaffold_annotations(scaffold_annotations)
-    scaffold_metadata = search_for_metadata_files(args.dataset_dir, args.max_size)
+    scaffold_metadata = search_for_metadata_files(dataset_dir, max_size)
 
     errors.extend(check_scaffold_metadata_annotated(scaffold_metadata, scaffold_annotations))
 
     for error in errors:
         print(error)
+        annotate_scaffold_file(dataset_dir, error.getLocation())
 
 
 if __name__ == "__main__":
