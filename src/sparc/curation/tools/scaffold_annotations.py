@@ -172,15 +172,33 @@ def check_scaffold_metadata_annotated(metadata, annotations):
             errors.append(ScaffoldAnnotationError(f"Found scaffold metadata file that is not annotated '{md.location()}'.", md.location()))
     return errors
 
+def get_confirmation_message():
+    "To fix this error, the 'additional types' of filename in manifestFile will be set to MIME."
+    "To fix this error, a manifestFile will be created under manifestDir, and will insert the filename in this manifestFile with 'additional types' MIME."
+    
+    "To fix this error, the data of filename in manifestFile will be deleted."
+    pass
+
 def annotate_scaffold_file(dataset_dir, file_location):
     manifestDataFrame = read_manifest(dataset_dir)
-    fileDF = manifestDataFrame[manifestDataFrame["filename"] == os.path.basename(file_location)]
+    fileDir = os.path.dirname(file_location)
+    fileName = os.path.basename(file_location)
+    fileDF = manifestDataFrame[manifestDataFrame["filename"] == fileName]
     # If fileDF is empty, means there's no manifest file contain this file. 
     # Check if there's manifest file under same dir. Add file to the manifest.
     # If no manifest file create new manifest file
-    # Todo
+    if fileDF.empty:
+        # Check if there's manifest file under Scaffold File Dir
+        newRow = pd.DataFrame({"filename":fileName,"additional types":SCAFFOLD_FILE_MIME},index = [1])
+        if not manifestDataFrame[manifestDataFrame["manifest_dir"] == fileDir].empty:
+            mDF = pd.read_excel(os.path.join(fileDir,"manifest.xlsx"))
+            newRow = mDF.append(newRow,ignore_index=True)
+        newRow.to_excel(os.path.join(row["manifest_dir"],"manifest.xlsx"), sheet_name=row["sheet_name"], index=False, header=True)
+
     print(fileDF)
+    # insert_additional_types(fileDF)
     
+# def add_additional_types(fileDF):
     for index, row in fileDF.iterrows():
         fileLocation = os.path.join(row["manifest_dir"], row['filename'])
         if os.path.samefile(file_location, fileLocation):
