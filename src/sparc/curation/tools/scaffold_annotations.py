@@ -26,8 +26,11 @@ class ScaffoldAnnotationError(object):
     def getLocation(self):
         return self._location
 
-    def __str__(self):
+    def get_error_message(self):
         return f'Error: {self._message}'
+
+    # def __str__(self):
+    #     return f'Error: {self._message}'
 
 
 class ScaffoldAnnotation(object):
@@ -172,12 +175,19 @@ def check_scaffold_metadata_annotated(metadata, annotations):
             errors.append(ScaffoldAnnotationError(f"Found scaffold metadata file that is not annotated '{md.location()}'.", md.location()))
     return errors
 
-def get_confirmation_message():
+def get_confirmation_message(error):
     "To fix this error, the 'additional types' of filename in manifestFile will be set to MIME."
     "To fix this error, a manifestFile will be created under manifestDir, and will insert the filename in this manifestFile with 'additional types' MIME."
-    
+
     "To fix this error, the data of filename in manifestFile will be deleted."
-    pass
+    # TODO return different message based on input error type
+    message = "Let this magic tool fix this error for you."
+    return message
+
+def fix_error(error,dataset_dir):
+    # TODO different way to fix error based on input error type
+    annotate_scaffold_file(dataset_dir,error.getLocation())
+
 
 def annotate_scaffold_file(dataset_dir, file_location):
     manifestDataFrame = read_manifest(dataset_dir)
