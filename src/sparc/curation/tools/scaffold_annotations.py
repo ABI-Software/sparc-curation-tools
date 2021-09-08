@@ -22,10 +22,7 @@ ADDITIONAL_TYPES_COLUMN = 'additional types'
 MANIFEST_DIR_COLUMN = 'manifest_dir'
 SOURCE_OF_COLUMN = 'isSourceOf'
 DERIVED_FROM_COLUMN = 'isDerivedFrom'
-
 FILE_LOCATION_COLUMN = 'file_location'
-THUMBNAIL_LOCATION_COLUMN = 'thumbnail_location'
-IS_SCAFFOLD_COLUMN = 'isScaffold'
 
 
 class ScaffoldAnnotationError(object):
@@ -52,7 +49,6 @@ class NotAnnotatedError(ScaffoldAnnotationError):
             fileType = "View"    
         elif mime == SCAFFOLD_THUMBNAIL_MIME:
             fileType = "Thumbnail"  
-        # TODO Add View and Thumbnail here
         message = f"Found Scaffold '{fileType}' file that is not annotated '{location}'."
         super(NotAnnotatedError, self).__init__(message, location)
     
@@ -70,14 +66,34 @@ class NoThumbnailError(ScaffoldAnnotationError):
         super(NoThumbnailError, self).__init__(message, location)
 
 class NoDerivedFromError(ScaffoldAnnotationError):
-    def __init__(self, location):
-        message = f"Found thumbnail that has no scaffold metadata file '{location}'."
+    def __init__(self, location, mime):
+        self._mime = mime
+        if mime == SCAFFOLD_FILE_MIME:
+            fileType = "Metadata"
+        elif mime == SCAFFOLD_VIEW_MIME:
+            fileType = "View"    
+        elif mime == SCAFFOLD_THUMBNAIL_MIME:
+            fileType = "Thumbnail"  
+        message = f"Found '{fileType}' that has no derived from file '{location}'."
         super(NoDerivedFromError, self).__init__(message, location)
-
-class NotAScaffoldError(ScaffoldAnnotationError):
-    def __init__(self, location):
-        message = f'Scaffold "{location}" either does not exist or is not a scaffold.'
-        super(NotAScaffoldError, self).__init__(message, location)
+    
+    def get_mime(self):
+        return self._mime
+        
+class WrongAnnotatedError(ScaffoldAnnotationError):
+    def __init__(self, location, mime):
+        self._mime = mime
+        if mime == SCAFFOLD_FILE_MIME:
+            fileType = "Metadata"
+        elif mime == SCAFFOLD_VIEW_MIME:
+            fileType = "View"    
+        elif mime == SCAFFOLD_THUMBNAIL_MIME:
+            fileType = "Thumbnail"  
+        message = f'File "{location}" either does not exist or is not a scaffold "{fileType}".'
+        super(WrongAnnotatedError, self).__init__(message, location)
+    
+    def get_mime(self):
+        return self._mime
 
 class NotADirError(ScaffoldAnnotationError):
     def __init__(self, location):
@@ -103,12 +119,11 @@ class ManifestDataFrame(metaclass=Singleton):
     
     def setup_dataframe(self, dataset_dir, max_size):
         self.read_manifest(dataset_dir)
-        search_for_metadata_files(dataset_dir, max_size)
-        self.setup_data()
+        self.setup_data(dataset_dir, max_size)
         return self
 
     def read_manifest(self, dataset_dir):
-        self._annotatedScaffoldList = None
+        self._annotatedFileList = None
         self._realScaffoldList = None
         self.dataFrame_dir = dataset_dir
         result = list(Path(dataset_dir).rglob("manifest.xlsx"))
@@ -123,43 +138,19 @@ class ManifestDataFrame(metaclass=Singleton):
                 self._manifestDataFrame = pd.concat([currentDataFrame,self._manifestDataFrame])
         # print(manifestDataFrame)
         self._manifestDataFrame[FILE_LOCATION_COLUMN] = self._manifestDataFrame.apply(lambda row: os.path.join(row['manifest_dir'], row[FILENAME_COLUMN]) if pd.notnull(row[FILENAME_COLUMN]) else None, axis=1)
-        if SOURCE_OF_COLUMN in self._manifestDataFrame[self._manifestDataFrame.notna()]:
-            # print(self._manifestDataFrame)
-            self._manifestDataFrame[THUMBNAIL_LOCATION_COLUMN] = self._manifestDataFrame.apply(lambda row: os.path.join(row['manifest_dir'], row[SOURCE_OF_COLUMN]) if pd.notnull(row[SOURCE_OF_COLUMN]) else None, axis=1) 
         return self._manifestDataFrame
 
     def get_manifest(self):
         return self._manifestDataFrame
 
-    def setup_data(self):
-        self._annotatedScaffoldList = [ScaffoldMetadata(row) for i, row in self._manifestDataFrame[self._manifestDataFrame[ADDITIONAL_TYPES_COLUMN] == SCAFFOLD_FILE_MIME].iterrows()]
-        # TODO Get directly from files by search_for_metadata_files function
+    def setup_data(self, dataset_dir, max_size):
+        self._annotatedFileList = [ScaffoldAnnotation(row) for i, row in self._manifestDataFrame[self._manifestDataFrame[ADDITIONAL_TYPES_COLUMN].notnull()].iterrows()]
+        self._annotatedFileLocList = [i.get_location() for i in self._annotatedFileList]
+
         # real file should only return location links, coz they don't have view or any other info
-        self._realScaffoldList = [ScaffoldMetadata(row) for i, row in self._manifestDataFrame[self._manifestDataFrame[IS_SCAFFOLD_COLUMN] == True].iterrows()]
-
-        self._annotatedViewList = [ScaffoldView(row) for i, row in self._manifestDataFrame[self._manifestDataFrame[ADDITIONAL_TYPES_COLUMN] == SCAFFOLD_VIEW_MIME].iterrows()]
-        # TODO Get directly from files by search_for_metadata_files function
+        self._realScaffoldList = search_for_metadata_files(dataset_dir, max_size)
         self._realViewList = search_view_files(self.dataFrame_dir)
-
-        self._annotatedThumbnailList = [ScaffoldMetadata(row) for i, row in self._manifestDataFrame[self._manifestDataFrame[ADDITIONAL_TYPES_COLUMN] == SCAFFOLD_THUMBNAIL_MIME].iterrows()]
-        # TODO Get directly from files by search_for_metadata_files function
         self._realThumbnailList = search_thumbnail_files(self.dataFrame_dir)
-
-    # TODO Get ScaffoldMetadata by search_for_metadata_files function and Delete this function.
-    def set_true_scaffold(self, file_location):
-        # print("set true scaffold", file_location)
-        # self._manifestDataFrame.to_excel("manifestTest.xlsx")
-        # print(file_location)
-        fileInDF = self._manifestDataFrame.apply(lambda row: self.check_samefile(file_location, row[FILE_LOCATION_COLUMN]), axis = 1)
-        if IS_SCAFFOLD_COLUMN not in self._manifestDataFrame.columns:
-            self._manifestDataFrame[IS_SCAFFOLD_COLUMN] = False
-        if fileInDF.any():
-            # print("set in mani", file_location)
-            self._manifestDataFrame[IS_SCAFFOLD_COLUMN][fileInDF] = True
-        else:
-            print("set manifest file loc not in mani", file_location)
-            newRow = {FILENAME_COLUMN:os.path.basename(file_location), FILE_LOCATION_COLUMN: file_location, IS_SCAFFOLD_COLUMN: True}
-            self._manifestDataFrame = self._manifestDataFrame.append(newRow, ignore_index=True)
 
     def check_samefile(self, loc1, loc2):
         if pd.notnull(loc2):
@@ -169,79 +160,110 @@ class ManifestDataFrame(metaclass=Singleton):
 
     def get_real_scaffold(self):
         # Return a Series of filename
-        return self._realScaffoldList
+        return [os.path.basename(location) for location in self._realScaffoldList]
 
     def get_annotated_scaffold(self):
-        # Return a Series of filename
-        return self._annotatedScaffoldList
-
-    def get_false_real_scaffold(self):
-        # Return a Series of filename
-        # return self._manifestDataFrame[(self._manifestDataFrame[IS_SCAFFOLD_COLUMN] == False) & (self._manifestDataFrame[ADDITIONAL_TYPES_COLUMN] == SCAFFOLD_FILE_MIME)]
-        result = [] 
-        for i in self._annotatedScaffoldList:
-            if i  not in self._realScaffoldList:
+        result = []
+        for i in self._annotatedFileList:
+            if i._additionalType == SCAFFOLD_FILE_MIME:
                 result.append(i)
         return result
 
+    def get_annotated_view(self):
+        result = []
+        for i in self._annotatedFileList:
+            if i._additionalType == SCAFFOLD_VIEW_MIME:
+                result.append(i)
+        return result
+
+    def get_wrong_annotated_errors(self):
+        errors = [] 
+        for i in self._annotatedFileList:
+            if i._additionalType == SCAFFOLD_FILE_MIME:
+                if i.get_location() not in self._realScaffoldList:
+                    errors.append(WrongAnnotatedError(i.get_location(), i._additionalType))
+            
+            if i._additionalType == SCAFFOLD_VIEW_MIME:
+                if i.get_location() not in self._realViewList:
+                    errors.append(WrongAnnotatedError(i.get_location(), i._additionalType))
+
+            if i._additionalType == SCAFFOLD_THUMBNAIL_MIME:
+                if i.get_location() not in self._realThumbnailList:
+                    errors.append(WrongAnnotatedError(i.get_location(), i._additionalType))
+        return errors
+
     def get_unannotated_errors(self):
-        # Return a Series of filename
-        # return self._manifestDataFrame[(self._manifestDataFrame[IS_SCAFFOLD_COLUMN] == True) & (self._manifestDataFrame[ADDITIONAL_TYPES_COLUMN] != SCAFFOLD_FILE_MIME)]
         errors = []
+
         for i in self._realScaffoldList:
-            if i not in self._annotatedScaffoldList:
-                errors.append(NotAnnotatedError(i.get_location(), SCAFFOLD_FILE_MIME))
-
-        annotatedViewLocList = []
-        for i in self._annotatedViewList:
-            annotatedViewLocList.append(i.get_location())
-
-        annotatedThumbnailLocList = []
-        for i in self._annotatedThumbnailList:
-            annotatedThumbnailLocList.append(i.get_location())
-
+            if i not in self._annotatedFileLocList:
+                errors.append(NotAnnotatedError(i, SCAFFOLD_FILE_MIME))
 
         for i in self._realViewList:
-            if i not in annotatedViewLocList:
+            if i not in self._annotatedFileLocList:
                 errors.append(NotAnnotatedError(i, SCAFFOLD_VIEW_MIME))
         
         for i in self._realThumbnailList:
-            if i not in annotatedThumbnailLocList:
+            if i not in self._annotatedFileLocList:
                 errors.append(NotAnnotatedError(i, SCAFFOLD_THUMBNAIL_MIME))
         
         return errors
 
     def get_real_scaffold_no_view(self):
         result = []
-        for i in self._realScaffoldList:
-            if i.get_views:
+        for i in self._annotatedFileList:
+            if i.get_location() in self._realScaffoldList and not i.get_children():
                 result.append(i)
         return result
-        # return self._manifestDataFrame[(self._manifestDataFrame[IS_SCAFFOLD_COLUMN] == True) & (pd.isnull(self._manifestDataFrame[THUMBNAIL_LOCATION_COLUMN]))]
 
     def get_view_no_thumbnail(self):
         result = []
-        for i in self._realScaffoldList:
-            if i.get_views():
-                for j in i.get_views():
-                    if not j:
-                        result.append(i)
+        for i in self._annotatedFileList:
+            if i.get_location() in self._realViewList and not i.get_children():
+                result.append(i)
         return result
 
-class ScaffoldMetadata(object):
+    def get_view_no_scaffold(self):
+        result = []
+        for i in self._annotatedFileList:
+            if i.get_location() in self._realViewList and not i.get_parent():
+                result.append(i)
+        return result
+
+    def get_thumbnail_no_view(self):
+        result = []
+        for i in self._annotatedFileList:
+            if i.get_location() in self._realThumbnailList and not i.get_parent():
+                result.append(i)
+        return result
+
+
+class ScaffoldAnnotation(object):
     '''
     TODO use this class to wrap one dataframe row to an object.
+    Only rows with ADDITIONAL_TYPES_COLUMN will be wrapped by this class
     '''
 
     def __init__(self, dfRow):
-        self._dir = dfRow[FILE_LOCATION_COLUMN]
+        self._dir = dfRow[FILE_LOCATION_COLUMN] # ??? I forget what's this for
+        self._manifestDir = dfRow[MANIFEST_DIR_COLUMN]
         self._fileName = dfRow[FILENAME_COLUMN]
-        # self._thumbnail = dfRow[THUMBNAIL_LOCATION_COLUMN]
         self._location = dfRow[FILE_LOCATION_COLUMN]
-        self._views = None
+        self._additionalType = None
+        self._children = None
+        self._parent = None
+
+        if ADDITIONAL_TYPES_COLUMN in dfRow:
+            if isinstance(dfRow[ADDITIONAL_TYPES_COLUMN],str):
+                self._additionalType = dfRow[ADDITIONAL_TYPES_COLUMN]
+
         if SOURCE_OF_COLUMN in dfRow:
             if isinstance(dfRow[SOURCE_OF_COLUMN],str):
-                self._views = [ScaffoldView(filename, dfRow[MANIFEST_DIR_COLUMN]) for filename in dfRow[SOURCE_OF_COLUMN].split(',')]
+                self._children = [str(os.path.join(self._manifestDir, filename)) for filename in dfRow[SOURCE_OF_COLUMN].split(',')]
+
+        if DERIVED_FROM_COLUMN in dfRow:
+            if isinstance(dfRow[DERIVED_FROM_COLUMN],str):
+                self._parent = str(os.path.join(self._manifestDir, dfRow[DERIVED_FROM_COLUMN]))
 
     def get_location(self):
         return os.path.normpath(os.path.join(self._location))
@@ -252,139 +274,23 @@ class ScaffoldMetadata(object):
     def get_dir(self):
         return self._dir
 
-    def set_file(self, file):
+    def set_filename(self, file):
         self._fileName = file
 
-    def get_file(self):
+    def get_filename(self):
         return self._fileName
 
-    def add_view(self, thumbnail):
-        self._views = thumbnail
+    def get_children(self):
+        return self._children
 
-    def remove_view(self, thumbnail):
-        self._views = thumbnail
+    def get_parent(self):
+        return self._parent
 
-    def get_views(self):
-        return self._views
+    def get_thumbnail(self):
+        return self._children[0]
 
     def __eq__(self, other):
         return os.path.samefile(self.get_location() , other.get_location())
-
-class ScaffoldView(object):
-    '''
-    filename : mouseColon_view.json 
-    description : Scaffold view file
-    File type : json
-    Additional types : inode/vnd.abi.scaffold.view+file
-    isSourceOf : thumbnail.png
-    isDerivedFrom : mouseColon_metadata.json
-    '''
-
-    def __init__(self, dfRow):
-        self._dir = dfRow[FILE_LOCATION_COLUMN]
-        self._fileName = dfRow[FILENAME_COLUMN]
-        self._location = dfRow[FILE_LOCATION_COLUMN]
-        if SOURCE_OF_COLUMN in dfRow:
-            if isinstance(dfRow[SOURCE_OF_COLUMN],str):
-                self._thumbnail = [filename for filename in dfRow[SOURCE_OF_COLUMN].split(',')]
-
-    def get_filename(self):
-        return self._fileName
-
-    def get_location(self):
-        return os.path.normpath(os.path.join(self._location))
-
-    def set_thumbnail(self, filename, manifestDir):
-        if not manifestDir:
-            return
-        mDF = pd.read_excel(os.path.join(manifestDir,"manifest.xlsx"))
-        # Find View by name
-        # If not view, not annotated, return
-        if mDF[mDF[FILENAME_COLUMN] == filename].empty:
-            return
-        # If find view, isAnnotated = True, find thumbnail
-        self._isAnnotated = True
-        if SOURCE_OF_COLUMN not in mDF.columns:
-            return
-        thumbnailName = mDF[SOURCE_OF_COLUMN][mDF[FILENAME_COLUMN]==filename]
-        # print(mDF)
-        print(thumbnailName)
-        if thumbnailName.empty:
-            return
-        else:
-            self._thumbnail = thumbnailName.iloc[0]
-        # mDF[SOURCE_OF_COLUMN][mDF["filename"]==fileName] = thumbnailName
-    # else:
-        # Find the manifest file contain the file annotation
-        # mDF = pd.read_excel(io)
-        # TODO
-        # mDF.to_excel(os.path.join(fileDir,"manifest.xlsx"), index=False, header=True)
-    # mDF.to_excel(os.path.join(fileDir,"manifest.xlsx"), index=False, header=True)
-
-    def get_thumbnail(self):
-        return self._thumbnail
-
-    def isAnnotated():
-        return self._isAnnotated
-
-class ScaffoldThumbnail(object):
-    '''
-    filename : mouseColon_view.json 
-    description : Scaffold view file
-    File type : json
-    Additional types : inode/vnd.abi.scaffold.view+file
-    isSourceOf : thumbnail.png
-    isDerivedFrom : mouseColon_metadata.json
-    '''
-
-    def __init__(self, filename, manifestDir):
-        self._fileName = filename
-        self._isAnnotated = False
-        self._thumbnail = None
-        self._location = None
-        self.set_thumbnail(filename, manifestDir)
-
-    def get_filename(self):
-        return self._fileName
-
-    def get_location(self):
-        return os.path.normpath(os.path.join(self._location))
-
-    def set_thumbnail(self, filename, manifestDir):
-        if not manifestDir:
-            return
-
-def create_scaffold_annotation(df):
-    value = None
-    base_dir = df['manifest_dir']
-    filename = df['filename']
-    mime = df['additional types']
-    if mime in TARGET_MIMES:
-        value = ScaffoldMetadata(base_dir)
-        if mime == SCAFFOLD_DIR_MIME:
-            value.set_dir(filename)
-        elif mime == SCAFFOLD_FILE_MIME:
-            value.set_file(filename)
-            if SOURCE_OF_COLUMN in df[df.notna()]:
-                value.set_thumbnail(os.path.join(base_dir,df[SOURCE_OF_COLUMN]))
-        elif mime == SCAFFOLD_THUMBNAIL_MIME:
-            value.set_thumbnail(filename)
-        if not value.file():
-            value = None
-    return value
-
-
-def check_scaffold_annotations(scaffold_annotations):
-    errors = []
-    for scaffold_annotation in scaffold_annotations:
-        location = scaffold_annotation.location()
-        if scaffold_annotation.is_dir():
-            if not os.path.isdir(location):
-                errors.append(NotADirError(location))
-        elif not os.path.isfile(location):
-            errors.append(ScaffoldAnnotationError(f'File "{location}" does not exist.', location))
-    return errors
-
 
 def search_for_metadata_files(dataset_dir, max_size):
     metadata = []
@@ -414,27 +320,22 @@ def search_for_metadata_files(dataset_dir, max_size):
                 pass
 
         if meta:
-            # metadata.append(ScaffoldMetadata(os.path.dirname(r), file=os.path.split(r)[1]))
-            ManifestDataFrame().set_true_scaffold(r)
+            metadata.append(str(r))
 
-    # return metadata
+    return metadata
 
 def search_thumbnail_files(dataset_dir):
     result = list(Path(dataset_dir).rglob("thumbnail*"))
-    # print(result)
-    return result
+    return [str(x) for x in result]
 
 def search_view_files(dataset_dir):
-    result = list(Path(dataset_dir).rglob("*view*"))
-    print(result)
-    return result
+    result = list(Path(dataset_dir).rglob("*view*.json"))
+    return [str(x) for x in result]
 
-def check_scaffold_metadata_annotated():
+def check_additional_types_annotated():
     errors = []
     errors += ManifestDataFrame().get_unannotated_errors()
-    # print(ManifestDataFrame().get_unannotated_scaffold())
-    for row in ManifestDataFrame().get_false_real_scaffold():
-        errors.append(NotAScaffoldError(row.get_location()))
+    errors += ManifestDataFrame().get_wrong_annotated_errors()
     return errors
 
 def check_scaffold_view_annotated():
@@ -443,6 +344,8 @@ def check_scaffold_view_annotated():
     # scaffoldDF = manifestDataFrame[manifestDataFrame["additional types"]==SCAFFOLD_FILE_MIME]
     for scaffoldAnnotation in manifestDataFrame.get_real_scaffold_no_view():
         errors.append(NoViewError(scaffoldAnnotation.get_location()))
+    for scaffoldAnnotation in manifestDataFrame.get_view_no_scaffold():
+        errors.append(NoDerivedFromError(scaffoldAnnotation.get_location(), SCAFFOLD_VIEW_MIME))
     # Check if the view annotated wrong
     # for scaffoldAnnotation in manifestDataFrame.get_real_scaffold_no_view():
     #     errors.append(NoViewError(scaffoldAnnotation.get_location()))
@@ -455,15 +358,12 @@ def check_scaffold_thumbnail_annotated():
 
     for viewAnnotation in manifestDataFrame.get_view_no_thumbnail():
         errors.append(NoThumbnailError(viewAnnotation.get_location()))
+    for scaffoldAnnotation in manifestDataFrame.get_thumbnail_no_view():
+        errors.append(NoDerivedFromError(scaffoldAnnotation.get_location(), SCAFFOLD_THUMBNAIL_MIME))
     # Check if the thumbnail annotated wrong
     # for scaffoldAnnotation in manifestDataFrame.get_real_scaffold_no_thumbnail():
     #     errors.append(NoThumbnailError(scaffoldAnnotation.get_location()))
     return errors
-
-def get_none_rows(df,column):
-    if column in df.columns:
-        df = df[df[column].isnull()]
-    return df
 
 def get_confirmation_message(error):
     '''
@@ -478,22 +378,23 @@ def get_confirmation_message(error):
 
 def get_errors():
     errors = []
-    errors.extend(check_scaffold_metadata_annotated())
+    errors.extend(check_additional_types_annotated())
     errors.extend(check_scaffold_view_annotated())
     errors.extend(check_scaffold_thumbnail_annotated())
     return errors
 
 def fix_error(error):
-    # TODO different way to fix error based on input error type
-    if isinstance(error, NotAnnotatedError):
+    # Check wrong annotation before no annotation
+    if isinstance(error, WrongAnnotatedError):
+        update_additional_type(error.get_location(), None)
+    elif isinstance(error, NotAnnotatedError):
         update_additional_type(error.get_location(), error.get_mime())
     elif isinstance(error, NoViewError):
         set_source_of_column(error.get_location(), SCAFFOLD_VIEW_MIME)    
     elif isinstance(error, NoThumbnailError):
         set_source_of_column(error.get_location(), SCAFFOLD_THUMBNAIL_MIME)
-    elif isinstance(error, NotAScaffoldError):
-        remove_wrong_annotation(error.get_location())
-
+    elif isinstance(error, NoDerivedFromError):
+        update_derived_from(error.get_location(), error.get_mime())        
 
 def set_source_of_column(file_location, mime):
     manifestDataFrame = ManifestDataFrame().get_manifest()
@@ -511,7 +412,7 @@ def set_source_of_column(file_location, mime):
         mDF[SOURCE_OF_COLUMN] = ""
     # TODO Change to Views
     viewNames = mDF["filename"][mDF["additional types"]==mime]
-    # print(mDF)
+
     if viewNames.empty:
         # Search from files
         if mime == SCAFFOLD_VIEW_MIME:
@@ -527,12 +428,46 @@ def set_source_of_column(file_location, mime):
         # TODO
     mDF.to_excel(os.path.join(manifestDir,"manifest.xlsx"), index=False, header=True)
 
+def update_derived_from(file_location, mime):
+    manifestDataFrame = ManifestDataFrame().get_manifest()
+    fileDir = os.path.dirname(file_location)
+    fileName = os.path.basename(file_location)
+    # Before add view, the scaffold metadata must already been annotated in manifest, otherwise fix the NoAnnotatedError first
+    fileDF = manifestDataFrame[manifestDataFrame["filename"].str.contains('\(/|\\)*' + fileName)== True]
+    manifestDir = fileDF["manifest_dir"].iloc[0]
+    # Search thumbnail in dataframe with same manifest_dir as scafflod
+    # If found, set it as isSourceOf
+    # If not, search file 
+    mDF = pd.read_excel(os.path.join(manifestDir,"manifest.xlsx"))
+    if DERIVED_FROM_COLUMN not in mDF.columns:
+        mDF[DERIVED_FROM_COLUMN] = ""
+    # TODO Change to Views
+    parentMime = SCAFFOLD_VIEW_MIME
+    if mime == SCAFFOLD_VIEW_MIME:
+        parentMime = SCAFFOLD_FILE_MIME
+    viewNames = mDF["filename"][mDF[ADDITIONAL_TYPES_COLUMN]==parentMime]
+
+    if viewNames.empty:
+        # Search from files
+        if parentMime == SCAFFOLD_VIEW_MIME:
+            viewLocations = search_view_files(fileDir)
+        elif parentMime == SCAFFOLD_FILE_MIME:
+            viewLocations = search_for_metadata_files(fileDir, 200000)
+        viewNames = [os.path.relpath(view, manifestDir) for view in viewLocations]
+    print(viewNames)
+    mDF[DERIVED_FROM_COLUMN][mDF["filename"].str.contains('\(/|\\)*' + fileName)== True] = ','.join(viewNames)
+    # else:
+        # Find the manifest file contain the file annotation
+        # mDF = pd.read_excel(io)
+        # TODO
+    mDF.to_excel(os.path.join(manifestDir,"manifest.xlsx"), index=False, header=True)
+
 def update_additional_type(file_location, fileMime):
     # TODO try not read all the manifest again
     manifestDataFrame = ManifestDataFrame().get_manifest()
     fileDir = os.path.dirname(file_location)
     fileName = os.path.basename(file_location)
-    fileDF = manifestDataFrame[manifestDataFrame["filename"] == fileName]
+    fileDF = manifestDataFrame[manifestDataFrame["filename"].str.contains('\(/|\\)*' + fileName)== True]
     # If fileDF is empty, means there's no manifest file contain this file. 
     # Check if there's manifest file under same dir. Add file to the manifest.
     # If no manifest file create new manifest file
@@ -544,33 +479,14 @@ def update_additional_type(file_location, fileMime):
             newRow = mDF.append(newRow,ignore_index=True)
         newRow.to_excel(os.path.join(fileDir,"manifest.xlsx"), index=False, header=True)
 
-    print(fileDF)
-    # insert_additional_types(fileDF)
-    
-# def add_additional_types(fileDF):
     for index, row in fileDF.iterrows():
         fileLocation = os.path.join(row["manifest_dir"], row['filename'])
         if os.path.samefile(file_location, fileLocation):
             mDF = pd.read_excel(os.path.join(row["manifest_dir"],"manifest.xlsx"),sheet_name=row["sheet_name"])
-            mDF['additional types'][mDF["filename"] == row['filename']] = fileMime
-            mDF.to_excel(os.path.join(row["manifest_dir"],"manifest.xlsx"), sheet_name=row["sheet_name"], index=False, header=True)
-
-def remove_wrong_annotation(file_location):
-    # TODO try not read all the manifest again
-    manifestDataFrame = ManifestDataFrame().get_manifest()
-    fileDir = os.path.dirname(file_location)
-    fileName = os.path.basename(file_location)
-    fileDF = manifestDataFrame[manifestDataFrame["filename"].str.contains('\(/|\\)*' + fileName)== True]
-
-    print("remove_wrong_annotation " , fileDF)
-    # insert_additional_types(fileDF)
-
-# def add_additional_types(fileDF):
-    for index, row in fileDF.iterrows():
-        fileLocation = os.path.join(row["manifest_dir"], row['filename'])
-        if os.path.samefile(file_location, fileLocation):
-            mDF = pd.read_excel(os.path.join(row["manifest_dir"],"manifest.xlsx"),sheet_name=row["sheet_name"])
-            mDF['additional types'][mDF["filename"] == row['filename']] = None
+            if ADDITIONAL_TYPES_COLUMN not in mDF.columns:
+                mDF[ADDITIONAL_TYPES_COLUMN] = ""
+            print(fileMime)
+            mDF[ADDITIONAL_TYPES_COLUMN][mDF["filename"] == row['filename']] = fileMime
             mDF.to_excel(os.path.join(row["manifest_dir"],"manifest.xlsx"), sheet_name=row["sheet_name"], index=False, header=True)
 
 def convert_size(size_bytes):
@@ -581,7 +497,6 @@ def convert_size(size_bytes):
     s = round(size_bytes / p, 2)
     return f"{s}{SIZE_NAME[i]}"
 
-
 def convert_to_bytes(size_string):
     m = re.match(r'^(\d+)(B|KiB|MiB|GiB|PiB|EiB|ZiB|YiB)$', size_string)
     if not m:
@@ -589,7 +504,6 @@ def convert_to_bytes(size_string):
     start = m.group(1)
     end = m.group(2)
     return int(start) * math.pow(1024, SIZE_NAME.index(end))
-
 
 def main():
     parser = argparse.ArgumentParser(description='Check scaffold annotations for a SPARC dataset.')
@@ -601,15 +515,14 @@ def main():
     max_size = 1000000000
 
     ManifestDataFrame().setup_dataframe(dataset_dir, max_size)
-    search_for_metadata_files(dataset_dir, max_size)
 
-    # errors = check_scaffold_annotations()
     errors = get_errors()
 
     for error in errors:
         print(error.get_error_message())
         fix_error(error)
     print(ManifestDataFrame().get_real_scaffold())
+    search_view_files(dataset_dir)
 
 
 if __name__ == "__main__":
