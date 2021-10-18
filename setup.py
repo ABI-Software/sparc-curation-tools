@@ -1,6 +1,17 @@
 import io
+import os
+import re
 
 from setuptools import setup, find_packages
+
+here = os.path.abspath(os.path.dirname(__file__))
+
+with open(os.path.join(here, 'src', 'sparc', 'curation', 'tools', '__init__.py')) as fd:
+    version = re.search(r'^__version__\s*=\s*[\'"]([^\'"]*)[\'"]',
+                        fd.read(), re.MULTILINE).group(1)
+
+if not version:
+    raise RuntimeError('Cannot find version information')
 
 
 def readfile(filename, split=False):
@@ -25,7 +36,7 @@ requires = ['pandas', 'openpyxl']
 
 setup(
     name='sparc-curation-tools',
-    version='0.1.0.dev3',
+    version=version,
     description='A collection of tools to help with curating SPARC datasets..',
     long_description='\n'.join(readme) + software_licence,
     long_description_content_type='text/x-rst',
