@@ -68,6 +68,21 @@ class ManifestDataFrame(metaclass=Singleton):
         def get_scaffold_locations(self):
             return self._data['locations']
 
+        def get_metadata_filenames(self):
+            filenames = []
+            for i in self._data['annotations']:
+                if i.get_additional_type() == SCAFFOLD_FILE_MIME:
+                    filenames.append(i.get_location())
+
+            return filenames
+
+        def get_derived_filenames(self, source):
+            for i in self._data['annotations']:
+                if i.get_parent() == source:
+                    return i.get_location()
+
+            return ''
+
         def get_incorrect_annotations(self, on_disk):
             errors = []
 
@@ -100,11 +115,8 @@ class ManifestDataFrame(metaclass=Singleton):
                 if i not in self._data['locations']:
                     errors.append(NotAnnotatedError(i, SCAFFOLD_FILE_MIME))
 
-            print('get missing annotations')
             for i in on_disk_view_files:
                 if i not in self._data['locations']:
-                    print('append error')
-                    print(i)
                     errors.append(NotAnnotatedError(i, SCAFFOLD_VIEW_MIME))
 
             for i in on_disk_thumbnail_files:
@@ -146,21 +158,3 @@ class ManifestDataFrame(metaclass=Singleton):
                 if i.get_location() in on_disk_thumbnail_files and not i.get_parent():
                     result.append(NoDerivedFromError(i.get_location(), SCAFFOLD_THUMBNAIL_MIME))
             return result
-    # def get_real_scaffold(self):
-    #     # Return a Series of filename
-    #     return [os.path.basename(location) for location in self._realScaffoldList]
-    #
-    # def get_annotated_scaffold(self):
-    #     result = []
-    #     for i in self._annotatedFileList:
-    #         if i._additionalType == SCAFFOLD_FILE_MIME:
-    #             result.append(i)
-    #     return result
-    #
-    # def get_annotated_view(self):
-    #     result = []
-    #     for i in self._annotatedFileList:
-    #         if i._additionalType == SCAFFOLD_VIEW_MIME:
-    #             result.append(i)
-    #     return result
-    #
