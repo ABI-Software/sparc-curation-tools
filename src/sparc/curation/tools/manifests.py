@@ -19,20 +19,15 @@ class ManifestDataFrame(metaclass=Singleton):
         return self
 
     def read_manifest(self, dataset_dir):
-        # self._annotatedFileList = None
-        # self._realScaffoldList = None
-        # self.dataFrame_dir = dataset_dir
         result = list(Path(dataset_dir).rglob("manifest.xlsx"))
         self._manifestDataFrame = pd.DataFrame()
         for r in result:
             xl_file = pd.ExcelFile(r)
-            # print(xl_file)
             for sheet_name in xl_file.sheet_names:
                 currentDataFrame = xl_file.parse(sheet_name)
                 currentDataFrame['sheet_name'] = sheet_name
                 currentDataFrame['manifest_dir'] = os.path.dirname(r)
                 self._manifestDataFrame = pd.concat([currentDataFrame, self._manifestDataFrame])
-        # print(manifestDataFrame)
         self._manifestDataFrame[FILE_LOCATION_COLUMN] = self._manifestDataFrame.apply(
             lambda row: os.path.join(row['manifest_dir'], row[FILENAME_COLUMN]) if pd.notnull(row[FILENAME_COLUMN]) else None, axis=1)
         return self._manifestDataFrame
@@ -42,9 +37,12 @@ class ManifestDataFrame(metaclass=Singleton):
 
     def setup_data(self):
         self._scaffold_data = ManifestDataFrame.Scaffold()
-        self._scaffold_data.set_scaffold_annotations(
-            [ScaffoldAnnotation(row) for i, row in self._manifestDataFrame[self._manifestDataFrame[ADDITIONAL_TYPES_COLUMN].notnull()].iterrows()]
-        )
+        try:
+            self._scaffold_data.set_scaffold_annotations(
+                [ScaffoldAnnotation(row) for i, row in self._manifestDataFrame[self._manifestDataFrame[ADDITIONAL_TYPES_COLUMN].notnull()].iterrows()]
+            )
+        except KeyError:
+            pass
         self._scaffold_data.set_scaffold_locations([i.get_location() for i in self._scaffold_data.get_scaffold_annotations()])
 
     def get_scaffold_data(self):
