@@ -5,9 +5,10 @@ import pandas as pd
 from sparc.curation.tools.annotations.scaffold import IncorrectAnnotationError, NoViewError, NoThumbnailError, NoDerivedFromError, NotAnnotatedError
 from sparc.curation.tools.definitions import ADDITIONAL_TYPES_COLUMN, SOURCE_OF_COLUMN, \
     DERIVED_FROM_COLUMN, SCAFFOLD_VIEW_MIME, SCAFFOLD_THUMBNAIL_MIME, SCAFFOLD_FILE_MIME
+from sparc.curation.tools.errors import AnnotationDirectoryNoWriteAccess
 from sparc.curation.tools.manifests import ManifestDataFrame
 from sparc.curation.tools.ondisk import OnDiskFiles
-from sparc.curation.tools.utilities import convert_to_bytes
+from sparc.curation.tools.utilities import convert_to_bytes, is_same_file
 
 
 def check_additional_types_annotations():
@@ -53,7 +54,7 @@ def get_confirmation_message(error):
 
 def set_source_of_column(file_location, mime):
     manifestDataFrame = ManifestDataFrame().get_manifest()
-    fileDir = os.path.dirname(file_location)
+    # fileDir = os.path.dirname(file_location)
     fileName = os.path.basename(file_location)
     # Before add view, the scaffold metadata must already been annotated in manifest, otherwise fix the NoAnnotatedError first
     fileDF = manifestDataFrame[manifestDataFrame["filename"].str.contains(r'\(/|\)*' + fileName)]
@@ -87,7 +88,7 @@ def set_source_of_column(file_location, mime):
 
 def update_derived_from(file_location, mime):
     manifestDataFrame = ManifestDataFrame().get_manifest()
-    fileDir = os.path.dirname(file_location)
+    # fileDir = os.path.dirname(file_location)
     fileName = os.path.basename(file_location)
     # Before add view, the scaffold metadata must already been annotated in manifest, otherwise fix the NoAnnotatedError first
     fileDF = manifestDataFrame[manifestDataFrame["filename"].str.contains(r'\(/|\)*' + fileName)]
@@ -140,7 +141,7 @@ def update_additional_type(file_location, file_mime):
 
     for index, row in fileDF.iterrows():
         fileLocation = os.path.join(row["manifest_dir"], row['filename'])
-        if os.path.samefile(file_location, fileLocation):
+        if is_same_file(file_location, fileLocation):
             mDF = pd.read_excel(os.path.join(row["manifest_dir"], "manifest.xlsx"), sheet_name=row["sheet_name"])
             if ADDITIONAL_TYPES_COLUMN not in mDF.columns:
                 mDF[ADDITIONAL_TYPES_COLUMN] = ""
@@ -149,6 +150,13 @@ def update_additional_type(file_location, file_mime):
 
 
 def fix_error(error):
+    checked_locations = []
+    for manifest_dir in ManifestDataFrame().get_manifest()['manifest_dir']:
+        if manifest_dir not in checked_locations:
+            checked_locations.append(manifest_dir)
+            if not os.access(manifest_dir, os.W_OK):
+                raise AnnotationDirectoryNoWriteAccess(f"Cannot write to directory {manifest_dir}.")
+
     # Check incorrect annotation before no annotation
     if isinstance(error, IncorrectAnnotationError):
         update_additional_type(error.get_location(), None)
@@ -167,7 +175,7 @@ def main():
     parser.add_argument("dataset_dir", help='directory to check.')
     parser.add_argument("-m", "--max-size", help="Set the max size for metadata file. Default is 2MiB", default='2MiB', type=convert_to_bytes)
     parser.add_argument("-r", "--report", help="Report any errors that were found.", action='store_true')
-    parser.add_argument("-x", "--fix", help="Fix any errors that were found.", action='store_true')
+    parser.add_argument("-f", "--fix", help="Fix any errors that were found.", action='store_true')
 
     args = parser.parse_args()
     dataset_dir = args.dataset_dir

@@ -5,16 +5,39 @@ from pathlib import Path
 from sparc.curation.tools.base import Singleton
 
 
+ZINC_GRAPHICS_TYPES = ["points", "lines", "surfaces", "contours", "streamlines"]
+
+
+def _is_graphics_entry(entry):
+    if 'URL' in entry and 'Type' in entry:
+        entry_type = entry['Type']
+        if entry_type.lower() in ZINC_GRAPHICS_TYPES:
+            return True
+
+    return False
+
+
+def _is_view_entry(entry):
+    if 'URL' in entry and 'Type' in entry:
+        entry_type = entry['Type']
+        if entry_type.lower() == "view":
+            return True
+
+    return False
+
+
 def test_for_metadata(json_data):
-    url_present = False
+    have_viewable_graphics = False
+    have_view_reference = False
     if json_data:
         if isinstance(json_data, list):
-            url_present = True
-            for d in json_data:
-                if 'URL' in d:
-                    url_present = True
+            for entry in json_data:
+                if not have_viewable_graphics and _is_graphics_entry(entry):
+                    have_viewable_graphics = True
+                if not have_view_reference and _is_view_entry(entry):
+                    have_view_reference = True
 
-    return url_present
+    return have_view_reference and have_viewable_graphics
 
 
 def test_for_view(json_data):

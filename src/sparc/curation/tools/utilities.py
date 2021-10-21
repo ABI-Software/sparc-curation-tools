@@ -31,3 +31,15 @@ def convert_to_bytes(size_string):
     start = m.group(1)
     end = m.group(2)
     return int(start) * math.pow(1024, SIZE_NAME.index(end))
+
+
+def is_same_file(path1, path2):
+    """Test if path1 is the same as path2.  If stat() on either fails and the paths
+     are non-empty test if the strings are the same."""
+    try:
+        return os.path.samefile(path1, path2)
+    except FileNotFoundError:
+        if path1 and path2:
+            return path1 == path2
+
+    return False
