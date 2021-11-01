@@ -5,7 +5,7 @@ import pandas as pd
 from sparc.curation.tools.annotations.scaffold import ScaffoldAnnotation, IncorrectAnnotationError, NotAnnotatedError, NoViewError, NoDerivedFromError, NoThumbnailError
 
 from sparc.curation.tools.base import Singleton
-from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN, FILENAME_COLUMN, ADDITIONAL_TYPES_COLUMN, SCAFFOLD_FILE_MIME, SCAFFOLD_VIEW_MIME, SCAFFOLD_THUMBNAIL_MIME
+from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN, FILENAME_COLUMN, ADDITIONAL_TYPES_COLUMN, SCAFFOLD_FILE_MIME, SCAFFOLD_VIEW_MIME, SCAFFOLD_THUMBNAIL_MIME, SCAFFOLD_DIR_MIME
 
 
 class ManifestDataFrame(metaclass=Singleton):
@@ -102,6 +102,9 @@ class ManifestDataFrame(metaclass=Singleton):
                 if i.get_additional_type() == SCAFFOLD_THUMBNAIL_MIME:
                     if i.get_location() not in on_disk_thumbnail_files:
                         errors.append(IncorrectAnnotationError(i.get_location(), i.get_additional_type()))
+                
+                if i.get_additional_type() == SCAFFOLD_DIR_MIME:
+                    errors.append(IncorrectAnnotationError(i.get_location(), i.get_additional_type()))
             return errors
 
         def get_missing_annotations(self, on_disk):

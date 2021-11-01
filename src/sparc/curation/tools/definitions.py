@@ -18,5 +18,6 @@ FILE_LOCATION_COLUMN = 'file_location'
 MIMETYPE_TO_FILETYPE_MAP = {
     SCAFFOLD_FILE_MIME: 'Metadata',
     SCAFFOLD_VIEW_MIME: 'View',
-    SCAFFOLD_THUMBNAIL_MIME: 'Thumbnail'
+    SCAFFOLD_THUMBNAIL_MIME: 'Thumbnail',
+    SCAFFOLD_DIR_MIME: 'Directory'
 }

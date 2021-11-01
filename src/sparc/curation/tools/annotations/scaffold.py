@@ -65,18 +65,6 @@ class IncorrectAnnotationError(ScaffoldAnnotationError):
         return self._mime
 
 
-class NotADirError(ScaffoldAnnotationError):
-    def __init__(self, location):
-        message = f"Directory '{location}' either does not exist or is not a directory."
-        super(NotADirError, self).__init__(message, location)
-
-
-class NotAFileError(ScaffoldAnnotationError):
-    def __init__(self, location):
-        message = "Not a file"
-        super(NotAFileError, self).__init__(message, location)
-
-
 class ScaffoldAnnotation(object):
     """
     TODO use this class to wrap one dataframe row to an object.
