@@ -1,6 +1,6 @@
 import os
 
-from sparc.curation.tools.definitions import MIMETYPE_TO_FILETYPE_MAP, FILE_LOCATION_COLUMN, MANIFEST_DIR_COLUMN, FILENAME_COLUMN, ADDITIONAL_TYPES_COLUMN, SOURCE_OF_COLUMN, \
+from sparc.curation.tools.definitions import MIMETYPE_TO_FILETYPE_MAP, MIMETYPE_TO_PARENT_FILETYPE_MAP, FILE_LOCATION_COLUMN, MANIFEST_DIR_COLUMN, FILENAME_COLUMN, ADDITIONAL_TYPES_COLUMN, SOURCE_OF_COLUMN, \
     DERIVED_FROM_COLUMN
 
 
@@ -42,13 +42,12 @@ class NoThumbnailError(ScaffoldAnnotationError):
         message = f"Found scaffold view file that has no thumbnail '{location}'."
         super(NoThumbnailError, self).__init__(message, location)
 
-
-class NoDerivedFromError(ScaffoldAnnotationError):
+class IncorrectDerivedFromError(ScaffoldAnnotationError):
     def __init__(self, location, mime):
         self._mime = mime
-        fileType = MIMETYPE_TO_FILETYPE_MAP.get(mime, 'unknown')
-        message = f"Found '{fileType}' that has no derived from file '{location}'."
-        super(NoDerivedFromError, self).__init__(message, location)
+        parentFileType = MIMETYPE_TO_PARENT_FILETYPE_MAP.get(mime, 'unknown')
+        message = f"File '{location}' either has no derived from file or it's not derived from a scaffold '{parentFileType}' file."
+        super(IncorrectDerivedFromError, self).__init__(message, location)
 
     def get_mime(self):
         return self._mime

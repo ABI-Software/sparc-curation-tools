@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 import pandas as pd
-from sparc.curation.tools.annotations.scaffold import ScaffoldAnnotation, IncorrectAnnotationError, NotAnnotatedError, NoViewError, NoDerivedFromError, NoThumbnailError
+from sparc.curation.tools.annotations.scaffold import ScaffoldAnnotation, IncorrectAnnotationError, NotAnnotatedError, NoViewError, NoThumbnailError, IncorrectDerivedFromError
 
 from sparc.curation.tools.base import Singleton
 from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN, FILENAME_COLUMN, ADDITIONAL_TYPES_COLUMN, SCAFFOLD_FILE_MIME, SCAFFOLD_VIEW_MIME, SCAFFOLD_THUMBNAIL_MIME, SCAFFOLD_DIR_MIME
@@ -105,6 +105,25 @@ class ManifestDataFrame(metaclass=Singleton):
                     errors.append(IncorrectAnnotationError(i.get_location(), i.get_additional_type()))
             return errors
 
+        def get_incorrect_derived_from(self, on_disk):
+            errors = []
+
+            on_disk_metadata_files = on_disk.get_scaffold_data().get_metadata_files()
+            on_disk_view_files = on_disk.get_scaffold_data().get_view_files()
+            on_disk_thumbnail_files = on_disk.get_scaffold_data().get_thumbnail_files()
+
+            for i in self._data['annotations']:
+
+                if i.get_additional_type() == SCAFFOLD_VIEW_MIME:
+                    if i.get_location() in on_disk_view_files and i.get_parent() not in on_disk_metadata_files:
+                        errors.append(IncorrectDerivedFromError(i.get_location(), SCAFFOLD_VIEW_MIME))
+
+                if i.get_additional_type() == SCAFFOLD_THUMBNAIL_MIME:
+                    if i.get_location() in on_disk_thumbnail_files and i.get_parent() not in on_disk_view_files:
+                        errors.append(IncorrectDerivedFromError(i.get_location(), SCAFFOLD_THUMBNAIL_MIME))
+
+            return errors
+
         def get_missing_annotations(self, on_disk):
             errors = []
 
@@ -136,26 +155,10 @@ class ManifestDataFrame(metaclass=Singleton):
                     errors.append(NoViewError(i.get_location()))
             return errors
 
-        def get_view_no_scaffold(self, on_disk):
-            errors = []
-            on_disk_view_files = on_disk.get_scaffold_data().get_view_files()
-            for i in self._data['annotations']:
-                if i.get_location() in on_disk_view_files and not i.get_parent():
-                    errors.append(NoDerivedFromError(i.get_location(), SCAFFOLD_VIEW_MIME))
-            return errors
-
         def get_view_no_thumbnail(self, on_disk):
             result = []
             on_disk_view_files = on_disk.get_scaffold_data().get_view_files()
             for i in self._data['annotations']:
                 if i.get_location() in on_disk_view_files and not i.get_children():
                     result.append(NoThumbnailError(i.get_location()))
-            return result
-
-        def get_thumbnail_no_view(self, on_disk):
-            result = []
-            on_disk_thumbnail_files = on_disk.get_scaffold_data().get_thumbnail_files()
-            for i in self._data['annotations']:
-                if i.get_location() in on_disk_thumbnail_files and not i.get_parent():
-                    result.append(NoDerivedFromError(i.get_location(), SCAFFOLD_THUMBNAIL_MIME))
             return result

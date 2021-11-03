@@ -2,7 +2,7 @@ import argparse
 import os
 import pandas as pd
 
-from sparc.curation.tools.annotations.scaffold import IncorrectAnnotationError, NoViewError, NoThumbnailError, NoDerivedFromError, NotAnnotatedError
+from sparc.curation.tools.annotations.scaffold import IncorrectAnnotationError, NoViewError, NoThumbnailError, NotAnnotatedError, IncorrectDerivedFromError
 from sparc.curation.tools.definitions import ADDITIONAL_TYPES_COLUMN, SOURCE_OF_COLUMN, \
     DERIVED_FROM_COLUMN, SCAFFOLD_VIEW_MIME, SCAFFOLD_THUMBNAIL_MIME, SCAFFOLD_FILE_MIME
 from sparc.curation.tools.errors import AnnotationDirectoryNoWriteAccess
@@ -17,26 +17,23 @@ def check_additional_types_annotations():
     errors += ManifestDataFrame().get_scaffold_data().get_incorrect_annotations(OnDiskFiles())
     return errors
 
-
-def check_scaffold_view_annotations():
+def check_derived_from_annotations():
     errors = []
-    errors.extend(ManifestDataFrame().get_scaffold_data().get_scaffold_no_view(OnDiskFiles()))
-    errors.extend(ManifestDataFrame().get_scaffold_data().get_view_no_scaffold(OnDiskFiles()))
+    errors += ManifestDataFrame().get_scaffold_data().get_incorrect_derived_from(OnDiskFiles())
     return errors
 
-
-def check_scaffold_thumbnail_annotations():
+def check_source_of_annotations():
     errors = []
+    errors.extend(ManifestDataFrame().get_scaffold_data().get_scaffold_no_view(OnDiskFiles()))
     errors.extend(ManifestDataFrame().get_scaffold_data().get_view_no_thumbnail(OnDiskFiles()))
-    errors.extend(ManifestDataFrame().get_scaffold_data().get_thumbnail_no_view(OnDiskFiles()))
     return errors
 
 
 def get_errors():
     errors = []
     errors.extend(check_additional_types_annotations())
-    errors.extend(check_scaffold_view_annotations())
-    errors.extend(check_scaffold_thumbnail_annotations())
+    errors.extend(check_derived_from_annotations())
+    errors.extend(check_source_of_annotations())
     return errors
 
 
@@ -79,51 +76,39 @@ def set_source_of_column(file_location, mime):
         viewNames = [os.path.relpath(view, manifestDir) for view in viewLocations]
 
     mDF.loc[mDF["filename"].str.contains(r'\(/|\)*' + fileName), SOURCE_OF_COLUMN] = ','.join(viewNames)
-    # else:
-    # Find the manifest file contain the file annotation
-    # mDF = pd.read_excel(io)
-    # TODO
     mDF.to_excel(os.path.join(manifestDir, "manifest.xlsx"), index=False, header=True)
 
 
 def update_derived_from(file_location, mime):
     manifestDataFrame = ManifestDataFrame().get_manifest()
-    # fileDir = os.path.dirname(file_location)
     fileName = os.path.basename(file_location)
-    # Before add view, the scaffold metadata must already been annotated in manifest, otherwise fix the NoAnnotatedError first
     fileDF = manifestDataFrame[manifestDataFrame["filename"].str.contains(r'\(/|\)*' + fileName)]
     manifestDir = fileDF["manifest_dir"].iloc[0]
-    # Search thumbnail in dataframe with same manifest_dir as scafflod
-    # If found, set it as isSourceOf
-    # If not, search file 
+
     mDF = pd.read_excel(os.path.join(manifestDir, "manifest.xlsx"))
     if DERIVED_FROM_COLUMN not in mDF.columns:
         mDF[DERIVED_FROM_COLUMN] = ""
-    # TODO Change to Views
-    parentMime = SCAFFOLD_VIEW_MIME
+    parentMime = None
     if mime == SCAFFOLD_VIEW_MIME:
         parentMime = SCAFFOLD_FILE_MIME
-    viewNames = mDF["filename"][mDF[ADDITIONAL_TYPES_COLUMN] == parentMime]
+    elif mime == SCAFFOLD_THUMBNAIL_MIME:
+        parentMime = SCAFFOLD_VIEW_MIME
+    parentFileNames = mDF["filename"][mDF[ADDITIONAL_TYPES_COLUMN] == parentMime]
 
-    if viewNames.empty:
+    if parentFileNames.empty:
         # Search from files
-        viewLocations = []
+        parentLocations = []
         if parentMime == SCAFFOLD_VIEW_MIME:
-            viewLocations = OnDiskFiles().get_scaffold_data().get_view_files()
+            parentLocations = OnDiskFiles().get_scaffold_data().get_view_files()
         elif parentMime == SCAFFOLD_FILE_MIME:
-            viewLocations = OnDiskFiles().get_scaffold_data().get_metadata_files()
-        viewNames = [os.path.relpath(view, manifestDir) for view in viewLocations]
+            parentLocations = OnDiskFiles().get_scaffold_data().get_metadata_files()
+        parentFileNames = [os.path.relpath(parentLocation, manifestDir) for parentLocation in parentLocations]
 
-    mDF.loc[mDF["filename"].str.contains(r'\(/|\)*' + fileName), DERIVED_FROM_COLUMN] = ','.join(viewNames)
-    # else:
-    # Find the manifest file contain the file annotation
-    # mDF = pd.read_excel(io)
-    # TODO
+    mDF.loc[mDF["filename"].str.contains(r'\(/|\)*' + fileName), DERIVED_FROM_COLUMN] = ','.join(parentFileNames)
     mDF.to_excel(os.path.join(manifestDir, "manifest.xlsx"), index=False, header=True)
 
 
 def update_additional_type(file_location, file_mime):
-    # TODO try not read all the manifest again
     manifestDataFrame = ManifestDataFrame().get_manifest()
     fileDir = os.path.dirname(file_location)
     fileName = os.path.basename(file_location)
@@ -166,9 +151,8 @@ def fix_error(error):
         set_source_of_column(error.get_location(), SCAFFOLD_VIEW_MIME)
     elif isinstance(error, NoThumbnailError):
         set_source_of_column(error.get_location(), SCAFFOLD_THUMBNAIL_MIME)
-    elif isinstance(error, NoDerivedFromError):
+    elif isinstance(error, IncorrectDerivedFromError):
         update_derived_from(error.get_location(), error.get_mime())
-
 
 def main():
     parser = argparse.ArgumentParser(description='Check scaffold annotations for a SPARC dataset.')
