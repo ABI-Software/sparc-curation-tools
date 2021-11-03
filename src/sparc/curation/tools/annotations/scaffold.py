@@ -45,8 +45,9 @@ class NoThumbnailError(ScaffoldAnnotationError):
 class IncorrectDerivedFromError(ScaffoldAnnotationError):
     def __init__(self, location, mime):
         self._mime = mime
+        fileType = MIMETYPE_TO_FILETYPE_MAP.get(mime, 'unknown')
         parentFileType = MIMETYPE_TO_PARENT_FILETYPE_MAP.get(mime, 'unknown')
-        message = f"File '{location}' either has no derived from file or it's not derived from a scaffold '{parentFileType}' file."
+        message = f"Found '{fileType}' file '{location}' either has no derived from file or it's not derived from a scaffold '{parentFileType}' file."
         super(IncorrectDerivedFromError, self).__init__(message, location)
 
     def get_mime(self):
