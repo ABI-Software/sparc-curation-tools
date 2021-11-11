@@ -28,12 +28,19 @@ class ManifestDataFrame(metaclass=Singleton):
                 currentDataFrame['sheet_name'] = sheet_name
                 currentDataFrame['manifest_dir'] = os.path.dirname(r)
                 self._manifestDataFrame = pd.concat([currentDataFrame, self._manifestDataFrame])
-        self._manifestDataFrame[FILE_LOCATION_COLUMN] = self._manifestDataFrame.apply(
-            lambda row: os.path.join(row['manifest_dir'], row[FILENAME_COLUMN]) if pd.notnull(row[FILENAME_COLUMN]) else None, axis=1)
+
+        if not self._manifestDataFrame.empty:
+            self._manifestDataFrame[FILE_LOCATION_COLUMN] = self._manifestDataFrame.apply(
+                lambda row: os.path.join(row['manifest_dir'], row[FILENAME_COLUMN]) if pd.notnull(row[FILENAME_COLUMN]) else None, axis=1)
         return self._manifestDataFrame
 
     def get_manifest(self):
         return self._manifestDataFrame
+
+    def create_manifest(self, manifest_dir):
+        self._manifestDataFrame[FILENAME_COLUMN] = ''
+        self._manifestDataFrame[FILE_LOCATION_COLUMN] = ''
+        self._manifestDataFrame['manifest_dir'] = manifest_dir
 
     def setup_data(self):
         self._scaffold_data = ManifestDataFrame.Scaffold()

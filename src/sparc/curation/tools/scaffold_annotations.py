@@ -151,11 +151,16 @@ def update_additional_type(file_location, file_mime):
 
 def fix_error(error):
     checked_locations = []
-    for manifest_dir in ManifestDataFrame().get_manifest()['manifest_dir']:
-        if manifest_dir not in checked_locations:
-            checked_locations.append(manifest_dir)
-            if not os.access(manifest_dir, os.W_OK):
-                raise AnnotationDirectoryNoWriteAccess(f"Cannot write to directory {manifest_dir}.")
+
+    manifest = ManifestDataFrame().get_manifest()
+    if manifest.empty:
+        ManifestDataFrame().create_manifest(error.get_location())
+    else:
+        for manifest_dir in manifest['manifest_dir']:
+            if manifest_dir not in checked_locations:
+                checked_locations.append(manifest_dir)
+                if not os.access(manifest_dir, os.W_OK):
+                    raise AnnotationDirectoryNoWriteAccess(f"Cannot write to directory {manifest_dir}.")
 
     # Check incorrect annotation before no annotation
     if isinstance(error, IncorrectAnnotationError):
