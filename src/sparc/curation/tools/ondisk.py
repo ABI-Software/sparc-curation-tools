@@ -74,17 +74,39 @@ def is_json_of_type(r, max_size, test_func):
 
     return result
 
+def get_view_urls(metadata_file):
+    view_urls = []
+    try:
+        with open(metadata_file, encoding='utf-8') as f:
+            file_data = f.read()
+        json_data = json.loads(file_data)
+        if json_data:
+            if isinstance(json_data, list):
+                for entry in json_data:
+                    if 'URL' in entry and 'Type' in entry:
+                        entry_type = entry['Type']
+                        if entry_type.lower() == "view":
+                            view_url = os.path.join(os.path.dirname(metadata_file), entry['URL'])
+                            view_urls.append(view_url)
+
+    except json.decoder.JSONDecodeError:
+        return view_urls
+
+    return view_urls
 
 def search_for_metadata_files(dataset_dir, max_size):
     metadata = []
+    metadata_views = {}
     result = list(Path(dataset_dir).rglob("*"))
     for r in result:
         meta = is_json_of_type(r, max_size, test_for_metadata)
 
         if meta:
             metadata.append(str(r))
+            view_urls = get_view_urls(str(r))
+            metadata_views[str(r)] = view_urls
 
-    return metadata
+    return metadata, metadata_views
 
 
 def search_for_thumbnail_files(dataset_dir):
@@ -122,11 +144,30 @@ class OnDiskFiles(metaclass=Singleton):
             'thumbnail': [],
         }
 
-        def set_metadate_files(self, files):
+        _metadata_views = {}
+
+        '''
+        _scaffold_structure = {
+            'metadata.json':{
+                'view.json':'thumbnail.png',
+                'view2.json':'thumbnail2.png'
+            },
+            'metadata2.json':{
+                'view.json':'thumbnail.png'
+            },
+        }
+
+        '''
+
+        def set_metadate_files(self, files, metadata_views):
             self._scaffold_files['metadata'] = files
+            self._metadata_views = metadata_views
 
         def get_metadata_files(self):
             return self._scaffold_files['metadata']
+        
+        def get_metadata_children_files(self):
+            return self._metadata_views
 
         def set_view_files(self, files):
             self._scaffold_files['view'] = files
@@ -145,7 +186,8 @@ class OnDiskFiles(metaclass=Singleton):
 
     def setup_dataset(self, dataset_dir, max_size):
         self._scaffold = OnDiskFiles.Scaffold()
-        self._scaffold.set_metadate_files(search_for_metadata_files(dataset_dir, max_size))
+        metadata_file, metadata_views = search_for_metadata_files(dataset_dir, max_size)
+        self._scaffold.set_metadate_files(metadata_file, metadata_views)
         self._scaffold.set_view_files(search_for_view_files(dataset_dir, max_size))
         self._scaffold.set_thumbnail_files(search_for_thumbnail_files(dataset_dir))
         return self
