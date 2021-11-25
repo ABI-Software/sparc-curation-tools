@@ -62,8 +62,8 @@ class ScaffoldAnnotation(object):
         self._fileName = dataframe_row[FILENAME_COLUMN]
         self._location = dataframe_row[FILE_LOCATION_COLUMN]
         self._additionalType = None
-        self._children = None
-        self._parent = None
+        self._children = []
+        self._parent = []
 
         if ADDITIONAL_TYPES_COLUMN in dataframe_row:
             if isinstance(dataframe_row[ADDITIONAL_TYPES_COLUMN], str):
@@ -76,6 +76,8 @@ class ScaffoldAnnotation(object):
         if DERIVED_FROM_COLUMN in dataframe_row:
             if isinstance(dataframe_row[DERIVED_FROM_COLUMN], str):
                 self._parent = str(os.path.join(self._manifestDir, dataframe_row[DERIVED_FROM_COLUMN]))
+                # Is it possible one file can have multiple derivedFrom files
+                # self._parent = [str(os.path.join(self._manifestDir, filename)) for filename in dataframe_row[DERIVED_FROM_COLUMN].split(',')]
 
     def get_location(self):
         return os.path.normpath(os.path.join(self._location))

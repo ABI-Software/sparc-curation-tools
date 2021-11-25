@@ -54,9 +54,6 @@ def update_source_of_column(file_location, mime):
     # Before add view, the scaffold metadata must already been annotated in manifest, otherwise fix the NoAnnotatedError first
     fileDF = manifestDataFrame[manifestDataFrame["filename"].str.contains(r'\(/|\)*' + fileName)]
     manifestDir = fileDF["manifest_dir"].iloc[0]
-    # Search thumbnail in dataframe with same manifest_dir as scafflod
-    # If found, set it as isSourceOf
-    # If not, search file 
 
     mDF = pd.read_excel(os.path.join(manifestDir, "manifest.xlsx"))
     if SOURCE_OF_COLUMN not in mDF.columns:
@@ -67,20 +64,33 @@ def update_source_of_column(file_location, mime):
         childrenLocations = OnDiskFiles().get_scaffold_data().get_metadata_children_files()[file_location]
         viewNames = [os.path.relpath(children, manifestDir) for children in childrenLocations]
         mDF.loc[mDF["filename"].str.contains(r'\(/|\)*' + fileName), SOURCE_OF_COLUMN] = ','.join(viewNames)
-
+    
+    # Search thumbnail in dataframe with same manifest_dir as scafflod
+    # If found, set it as isSourceOf
+    # If not, search file 
+    
     elif mime == SCAFFOLD_VIEW_MIME:
-        childrenLocations = OnDiskFiles().get_scaffold_data().get_thumbnail_files()
+        sa = ManifestDataFrame().get_scaffold_data().get_scaffold_annotations()
+        for i in sa:
+            if i.get_parent() == file_location:
+                childrenLocations = i.get_location()
+        if childrenLocations:
+            viewNames = os.path.relpath(childrenLocations, manifestDir)
+        if not childrenLocations:
+            childrenLocations = OnDiskFiles().get_scaffold_data().get_thumbnail_files()
         # viewNames = [os.path.relpath(children, manifestDir) for children in childrenLocations]
-        viewNames = os.path.relpath(childrenLocations[0], manifestDir)
+            viewNames = os.path.relpath(childrenLocations[0], manifestDir)
         mDF.loc[mDF["filename"].str.contains(r'\(/|\)*' + fileName), SOURCE_OF_COLUMN] = viewNames
 
     mDF.to_excel(os.path.join(manifestDir, "manifest.xlsx"), index=False, header=True)
 
 def update_derived_from(file_location, mime):
+    # For now each view or thumbnail file only can have one derived from file
     manifestDataFrame = ManifestDataFrame().get_manifest()
     fileName = os.path.basename(file_location)
     fileDF = manifestDataFrame[manifestDataFrame["filename"].str.contains(r'\(/|\)*' + fileName)]
     manifestDir = fileDF["manifest_dir"].iloc[0]
+    parentLocation = []
 
     mDF = pd.read_excel(os.path.join(manifestDir, "manifest.xlsx"))
     if DERIVED_FROM_COLUMN not in mDF.columns:
@@ -90,9 +100,23 @@ def update_derived_from(file_location, mime):
         parentMime = SCAFFOLD_FILE_MIME
     elif mime == SCAFFOLD_THUMBNAIL_MIME:
         parentMime = SCAFFOLD_VIEW_MIME
-    parentFileNames = mDF["filename"][mDF[ADDITIONAL_TYPES_COLUMN] == parentMime]
+    parentFileNames = mDF["filename"][mDF[ADDITIONAL_TYPES_COLUMN] == parentMime].tolist()
 
-    if parentFileNames.empty:
+    # Search thumbnail in dataframe with same manifest_dir as scafflod
+    # If found, set it as isSourceOf
+    # If not, search file 
+    if parentMime == SCAFFOLD_VIEW_MIME:
+        sa = ManifestDataFrame().get_scaffold_data().get_scaffold_annotations()
+        for i in sa:
+            if i.get_children() and file_location in i.get_children():
+                parentLocation = i.get_location()
+        if parentLocation:
+            parentFileNames = [os.path.relpath(parentLocation, manifestDir)]
+        if not parentLocation:
+            parentLocations = OnDiskFiles().get_scaffold_data().get_view_files()
+            parentFileNames = [os.path.relpath(parentLocation, manifestDir) for parentLocation in parentLocations]
+
+    if not parentFileNames:
         # Search from files
         parentLocations = []
         if parentMime == SCAFFOLD_VIEW_MIME:
@@ -102,6 +126,7 @@ def update_derived_from(file_location, mime):
         parentFileNames = [os.path.relpath(parentLocation, manifestDir) for parentLocation in parentLocations]
 
     mDF.loc[mDF["filename"].str.contains(r'\(/|\)*' + fileName), DERIVED_FROM_COLUMN] = ','.join(parentFileNames)
+    mDF.loc[mDF["filename"].str.contains(r'\(/|\)*' + fileName), DERIVED_FROM_COLUMN] = parentFileNames[0]
     mDF.to_excel(os.path.join(manifestDir, "manifest.xlsx"), index=False, header=True)
 
 

@@ -83,10 +83,12 @@ class ManifestDataFrame(metaclass=Singleton):
 
         def get_derived_filenames(self, source):
             for i in self._data['annotations']:
-                if i.get_parent() == source:
-                    return i.get_location()
+                if i.get_location() == source:
+                    return i.get_children()
+                # if i.get_parent() == source:
+                #     return i.get_location()
 
-            return ''
+            return []
 
         def get_missing_annotations(self, on_disk):
             errors = []
@@ -163,12 +165,18 @@ class ManifestDataFrame(metaclass=Singleton):
             for i in self._data['annotations']:
 
                 if i.get_additional_type() == SCAFFOLD_FILE_MIME:
-                    if i.get_location() in on_disk_metadata_files and not set(i.get_children()) == set(on_disk_metadata_children_files[i.get_location()]):
-                        errors.append(IncorrectSourceOfError(i.get_location(), SCAFFOLD_FILE_MIME))
+                    if i.get_location() in on_disk_metadata_files:
+                        if not i.get_children():
+                            errors.append(IncorrectSourceOfError(i.get_location(), SCAFFOLD_FILE_MIME))
+                        elif not set(i.get_children()) == set(on_disk_metadata_children_files[i.get_location()]):
+                            errors.append(IncorrectSourceOfError(i.get_location(), SCAFFOLD_FILE_MIME))
 
                 if i.get_additional_type() == SCAFFOLD_VIEW_MIME:
                     # Program to check the on_disk_thumbnail_files list contains all elements of i.get_children()
-                    if i.get_location() in on_disk_view_files and not all(item in on_disk_thumbnail_files for item in i.get_children()):
-                        errors.append(IncorrectSourceOfError(i.get_location(), SCAFFOLD_VIEW_MIME))
+                    if i.get_location() in on_disk_view_files:
+                        if not i.get_children():
+                            errors.append(IncorrectSourceOfError(i.get_location(), SCAFFOLD_VIEW_MIME))
+                        elif not all(item in on_disk_thumbnail_files for item in i.get_children()):
+                            errors.append(IncorrectSourceOfError(i.get_location(), SCAFFOLD_VIEW_MIME))
 
             return errors
