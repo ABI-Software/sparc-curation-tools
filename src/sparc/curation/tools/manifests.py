@@ -5,7 +5,9 @@ import pandas as pd
 from sparc.curation.tools.annotations.scaffold import ScaffoldAnnotation, IncorrectAnnotationError, NotAnnotatedError, IncorrectDerivedFromError, IncorrectSourceOfError
 
 from sparc.curation.tools.base import Singleton
-from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN, FILENAME_COLUMN, ADDITIONAL_TYPES_COLUMN, SCAFFOLD_FILE_MIME, SCAFFOLD_VIEW_MIME, SCAFFOLD_THUMBNAIL_MIME, SCAFFOLD_DIR_MIME
+from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN, FILENAME_COLUMN, ADDITIONAL_TYPES_COLUMN, SCAFFOLD_FILE_MIME, SCAFFOLD_VIEW_MIME, SCAFFOLD_THUMBNAIL_MIME, \
+    SCAFFOLD_DIR_MIME, DERIVED_FROM_COLUMN
+from sparc.curation.tools.errors import BadManifestError
 
 
 class ManifestDataFrame(metaclass=Singleton):
@@ -14,13 +16,13 @@ class ManifestDataFrame(metaclass=Singleton):
     _scaffold_data = None
 
     def setup_dataframe(self, dataset_dir):
-        self.read_manifest(dataset_dir)
+        self._read_manifest(dataset_dir)
         self.setup_data()
         return self
 
-    def read_manifest(self, dataset_dir):
-        result = list(Path(dataset_dir).rglob("manifest.xlsx"))
+    def _read_manifest(self, dataset_dir, depth=0):
         self._manifestDataFrame = pd.DataFrame()
+        result = list(Path(dataset_dir).rglob("manifest.xlsx"))
         for r in result:
             xl_file = pd.ExcelFile(r)
             for sheet_name in xl_file.sheet_names:
@@ -32,7 +34,12 @@ class ManifestDataFrame(metaclass=Singleton):
         if not self._manifestDataFrame.empty:
             self._manifestDataFrame[FILE_LOCATION_COLUMN] = self._manifestDataFrame.apply(
                 lambda row: os.path.join(row['manifest_dir'], row[FILENAME_COLUMN]) if pd.notnull(row[FILENAME_COLUMN]) else None, axis=1)
-        return self._manifestDataFrame
+
+        sanitised = self._sanitise_dataframe()
+        if sanitised and depth == 0:
+            self._read_manifest(dataset_dir, depth + 1)
+        elif sanitised and depth > 0:
+            raise BadManifestError('Manifest sanitisation error found.')
 
     def get_manifest(self):
         return self._manifestDataFrame
@@ -41,6 +48,33 @@ class ManifestDataFrame(metaclass=Singleton):
         self._manifestDataFrame[FILENAME_COLUMN] = ''
         self._manifestDataFrame[FILE_LOCATION_COLUMN] = ''
         self._manifestDataFrame['manifest_dir'] = manifest_dir
+
+    def _sanitise_is_derived_from(self, column_names):
+        sanitised = False
+        bad_column_name = ''
+        for column_name in column_names:
+            if column_name.lower() == DERIVED_FROM_COLUMN.lower():
+                if column_name != DERIVED_FROM_COLUMN:
+                    bad_column_name = column_name
+
+                break
+
+        if bad_column_name:
+            manifests = [row['manifest_dir'] for i, row in self._manifestDataFrame[self._manifestDataFrame[bad_column_name].notnull()].iterrows()]
+            unique_manifests = list(set(manifests))
+            for manifest_dir in unique_manifests:
+                current_manifest = os.path.join(manifest_dir, "manifest.xlsx")
+                mDF = pd.read_excel(current_manifest)
+                mDF.rename(columns={bad_column_name: DERIVED_FROM_COLUMN}, inplace=True)
+                mDF.to_excel(current_manifest, index=False, header=True)
+                sanitised = True
+
+        return sanitised
+
+    def _sanitise_dataframe(self):
+        column_names = self._manifestDataFrame.columns
+        sanitised = self._sanitise_is_derived_from(column_names)
+        return sanitised
 
     def setup_data(self):
         self._scaffold_data = ManifestDataFrame.Scaffold()
@@ -130,7 +164,7 @@ class ManifestDataFrame(metaclass=Singleton):
                 if i.get_additional_type() == SCAFFOLD_THUMBNAIL_MIME:
                     if i.get_location() not in on_disk_thumbnail_files:
                         errors.append(IncorrectAnnotationError(i.get_location(), i.get_additional_type()))
-                
+
                 if i.get_additional_type() == SCAFFOLD_DIR_MIME:
                     errors.append(IncorrectAnnotationError(i.get_location(), i.get_additional_type()))
             return errors

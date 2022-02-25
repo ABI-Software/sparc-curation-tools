@@ -1,6 +1,7 @@
 import os
 
-from sparc.curation.tools.definitions import MIMETYPE_TO_FILETYPE_MAP, MIMETYPE_TO_PARENT_FILETYPE_MAP, MIMETYPE_TO_CHILDREN_FILETYPE_MAP, FILE_LOCATION_COLUMN, MANIFEST_DIR_COLUMN, FILENAME_COLUMN, ADDITIONAL_TYPES_COLUMN, SOURCE_OF_COLUMN, \
+from sparc.curation.tools.definitions import MIMETYPE_TO_FILETYPE_MAP, MIMETYPE_TO_PARENT_FILETYPE_MAP, MIMETYPE_TO_CHILDREN_FILETYPE_MAP, FILE_LOCATION_COLUMN, \
+    MANIFEST_DIR_COLUMN, FILENAME_COLUMN, ADDITIONAL_TYPES_COLUMN, SOURCE_OF_COLUMN, \
     DERIVED_FROM_COLUMN
 
 
@@ -30,12 +31,14 @@ class NotAnnotatedError(ScaffoldAnnotationError):
         message = f"Found Scaffold '{fileType}' file that is not annotated '{location}'."
         super(NotAnnotatedError, self).__init__(message, location, mime)
 
+
 class IncorrectSourceOfError(ScaffoldAnnotationError):
     def __init__(self, location, mime):
         fileType = MIMETYPE_TO_FILETYPE_MAP.get(mime, 'unknown')
         childrenFileType = MIMETYPE_TO_CHILDREN_FILETYPE_MAP.get(mime, 'unknown')
         message = f"Found '{fileType}' file '{location}' either has no {childrenFileType} file or it's annotated to an incorrect file."
         super(IncorrectSourceOfError, self).__init__(message, location, mime)
+
 
 class IncorrectDerivedFromError(ScaffoldAnnotationError):
     def __init__(self, location, mime):
@@ -44,11 +47,13 @@ class IncorrectDerivedFromError(ScaffoldAnnotationError):
         message = f"Found '{fileType}' file '{location}' either has no derived from file or it's not derived from a scaffold '{parentFileType}' file."
         super(IncorrectDerivedFromError, self).__init__(message, location, mime)
 
+
 class IncorrectAnnotationError(ScaffoldAnnotationError):
     def __init__(self, location, mime):
         fileType = MIMETYPE_TO_FILETYPE_MAP.get(mime, 'unknown')
         message = f"File '{location}' either does not exist or is not a scaffold '{fileType}' file."
         super(IncorrectAnnotationError, self).__init__(message, location, mime)
+
 
 class ScaffoldAnnotation(object):
     """

@@ -6,3 +6,7 @@ class AnnotationError(Exception):
 
 class AnnotationDirectoryNoWriteAccess(AnnotationError):
     pass
+
+
+class BadManifestError(Exception):
+    pass

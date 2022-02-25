@@ -74,6 +74,7 @@ def is_json_of_type(r, max_size, test_func):
 
     return result
 
+
 def get_view_urls(metadata_file):
     view_urls = []
     try:

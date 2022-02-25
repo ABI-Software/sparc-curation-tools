@@ -17,15 +17,18 @@ def check_additional_types_annotations():
     errors += ManifestDataFrame().get_scaffold_data().get_incorrect_annotations(OnDiskFiles())
     return errors
 
+
 def check_derived_from_annotations():
     errors = []
     errors += ManifestDataFrame().get_scaffold_data().get_incorrect_derived_from(OnDiskFiles())
     return errors
 
+
 def check_source_of_annotations():
     errors = []
     errors.extend(ManifestDataFrame().get_scaffold_data().get_incorrect_source_of(OnDiskFiles()))
     return errors
+
 
 def get_errors():
     errors = []
@@ -47,7 +50,7 @@ def get_confirmation_message(error):
     return message
 
 
-def update_source_of_column(file_location, mime):
+def update_source_of(file_location, mime):
     manifestDataFrame = ManifestDataFrame().get_manifest()
     # fileDir = os.path.dirname(file_location)
     fileName = os.path.basename(file_location)
@@ -64,11 +67,11 @@ def update_source_of_column(file_location, mime):
         childrenLocations = OnDiskFiles().get_scaffold_data().get_metadata_children_files()[file_location]
         viewNames = [os.path.relpath(children, manifestDir) for children in childrenLocations]
         mDF.loc[mDF["filename"].str.contains(r'\(/|\)*' + fileName), SOURCE_OF_COLUMN] = ','.join(viewNames)
-    
+
     # Search thumbnail in dataframe with same manifest_dir as scafflod
     # If found, set it as isSourceOf
     # If not, search file 
-    
+
     elif mime == SCAFFOLD_VIEW_MIME:
         sa = ManifestDataFrame().get_scaffold_data().get_scaffold_annotations()
         for i in sa:
@@ -78,11 +81,12 @@ def update_source_of_column(file_location, mime):
             viewNames = os.path.relpath(childrenLocations, manifestDir)
         if not childrenLocations:
             childrenLocations = OnDiskFiles().get_scaffold_data().get_thumbnail_files()
-        # viewNames = [os.path.relpath(children, manifestDir) for children in childrenLocations]
+            # viewNames = [os.path.relpath(children, manifestDir) for children in childrenLocations]
             viewNames = os.path.relpath(childrenLocations[0], manifestDir)
         mDF.loc[mDF["filename"].str.contains(r'\(/|\)*' + fileName), SOURCE_OF_COLUMN] = viewNames
 
     mDF.to_excel(os.path.join(manifestDir, "manifest.xlsx"), index=False, header=True)
+
 
 def update_derived_from(file_location, mime):
     # For now each view or thumbnail file only can have one derived from file
@@ -177,7 +181,8 @@ def fix_error(error):
     elif isinstance(error, IncorrectDerivedFromError):
         update_derived_from(error.get_location(), error.get_mime())
     elif isinstance(error, IncorrectSourceOfError):
-        update_source_of_column(error.get_location(), error.get_mime())
+        update_source_of(error.get_location(), error.get_mime())
+
 
 def main():
     parser = argparse.ArgumentParser(description='Check scaffold annotations for a SPARC dataset.')
