@@ -9,9 +9,11 @@ from sparc.curation.tools.errors import IncorrectAnnotationError, NotAnnotatedEr
 from sparc.curation.tools.base import Singleton
 from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN, FILENAME_COLUMN, SUPPLEMENTAL_JSON_COLUMN, \
     ADDITIONAL_TYPES_COLUMN, ANATOMICAL_ENTITY_COLUMN, SCAFFOLD_FILE_MIME, SCAFFOLD_VIEW_MIME, \
-        SCAFFOLD_THUMBNAIL_MIME, SCAFFOLD_DIR_MIME, CONTEXT_INFO_MIME
+    SCAFFOLD_THUMBNAIL_MIME, SCAFFOLD_DIR_MIME, CONTEXT_INFO_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN
+from sparc.curation.tools.ondisk import OnDiskFiles
 
 from sparc.curation.tools.utilities import convert_to_bytes, is_same_file
+
 
 class ManifestDataFrame(metaclass=Singleton):
     # dataFrame_dir = ""
@@ -20,14 +22,14 @@ class ManifestDataFrame(metaclass=Singleton):
     _dataset_dir = None
 
     def setup_dataframe(self, dataset_dir):
-        self._read_manifest(dataset_dir)
         self._dataset_dir = dataset_dir
+        self._read_manifests()
         self.setup_data()
         return self
 
-    def _read_manifest(self, dataset_dir, depth=0):
+    def _read_manifests(self, depth=0):
         self._manifestDataFrame = pd.DataFrame()
-        result = list(Path(dataset_dir).rglob("manifest.xlsx"))
+        result = list(Path(self._dataset_dir).rglob("manifest.xlsx"))
         for r in result:
             xl_file = pd.ExcelFile(r)
             for sheet_name in xl_file.sheet_names:
@@ -42,7 +44,7 @@ class ManifestDataFrame(metaclass=Singleton):
 
         sanitised = self._sanitise_dataframe()
         if sanitised and depth == 0:
-            self._read_manifest(dataset_dir, depth + 1)
+            self._read_manifests(depth + 1)
         elif sanitised and depth > 0:
             raise BadManifestError('Manifest sanitisation error found.')
 
@@ -100,29 +102,40 @@ class ManifestDataFrame(metaclass=Singleton):
     def get_dataset_dir(self):
         return self._dataset_dir
 
+    def _get_matching_dataframe(self, file_location):
+        same_file = []
+
+        for index, row in self._manifestDataFrame.iterrows():
+            location = os.path.join(row["manifest_dir"], row["filename"])
+            same_file.append(is_same_file(file_location, location))
+
+        return self._manifestDataFrame[same_file]
+
     def get_file_dataframe(self, file_location):
         """
         " Get file dataframe which match the file_location
         """
         manifestDataFrame = self._manifestDataFrame
-        fileDir = os.path.dirname(file_location)
-        fileName = os.path.basename(file_location)
-        # Search data rows belong to the same file by file_location
-        same_file = []
-        for index, row in manifestDataFrame.iterrows():
-            location = os.path.join(row["manifest_dir"], row["filename"])
-            same_file.append(is_same_file(file_location, location))
-        fileDF = manifestDataFrame[same_file]
+        file_dir = os.path.dirname(file_location)
+        file_name = os.path.basename(file_location)
 
-        # If fileDF is empty, means there's no manifest file contain this file's annotation.
+        # Search data rows to find match to the same file by file_location.
+        fileDF = self._get_matching_dataframe(file_location)
+
+        # If fileDF is empty, means there's no manifest file containing this file's annotation.
         if fileDF.empty:
-            newRow = pd.DataFrame({"filename": fileName}, index=[1])
+            newRow = pd.DataFrame({"filename": file_name}, index=[1])
             # Check if there's manifest file under same Scaffold File Dir. If yes get data from it.
             # If no manifest file create new manifest file. Add file to the manifest.
-            if not manifestDataFrame[manifestDataFrame["manifest_dir"] == fileDir].empty:
-                mDF = pd.read_excel(os.path.join(fileDir, "manifest.xlsx"))
+            if not manifestDataFrame[manifestDataFrame["manifest_dir"] == file_dir].empty:
+                mDF = pd.read_excel(os.path.join(file_dir, "manifest.xlsx"))
                 newRow = mDF.append(newRow, ignore_index=True)
-            newRow.to_excel(os.path.join(fileDir, "manifest.xlsx"), index=False, header=True)
+            newRow.to_excel(os.path.join(file_dir, "manifest.xlsx"), index=False, header=True)
+
+            # Re-read manifests to find dataframe for newly added entry.
+            self._read_manifests()
+            fileDF = self._get_matching_dataframe(file_location)
+
         return fileDF
 
     def update_source_of_column(self, file_location, mime):
@@ -133,12 +146,12 @@ class ManifestDataFrame(metaclass=Singleton):
         if SOURCE_OF_COLUMN not in mDF.columns:
             mDF[SOURCE_OF_COLUMN] = ""
 
+        viewNames = ""
         childrenLocations = []
         if mime == SCAFFOLD_FILE_MIME:
             childrenLocations = OnDiskFiles().get_scaffold_data().get_metadata_children_files()[file_location]
             viewNames = [os.path.relpath(children, manifestDir) for children in childrenLocations]
-            mDF.loc[mDF["filename"].str.contains(r'\(/|\)*' + fileName), SOURCE_OF_COLUMN] = ','.join(viewNames)
-        
+
         # Search thumbnail in dataframe with same manifest_dir as scafflod
         # If found, set it as isSourceOf
         # If not, search file 
@@ -150,13 +163,11 @@ class ManifestDataFrame(metaclass=Singleton):
                     childrenLocations = i.get_location()
             if childrenLocations:
                 viewNames = os.path.relpath(childrenLocations, manifestDir)
-            if not childrenLocations:
+            else:
                 childrenLocations = OnDiskFiles().get_scaffold_data().get_thumbnail_files()
-            # viewNames = [os.path.relpath(children, manifestDir) for children in childrenLocations]
                 viewNames = os.path.relpath(childrenLocations[0], manifestDir)
-            mDF.loc[mDF["filename"].str.contains(r'\(/|\)*' + fileName), SOURCE_OF_COLUMN] = viewNames
 
-        mDF.to_excel(os.path.join(manifestDir, "manifest.xlsx"), index=False, header=True)
+        self.update_column_content(file_location, SOURCE_OF_COLUMN, viewNames)
 
     def update_derived_from(self, file_location, mime):
         # For now each view or thumbnail file only can have one derived from file
@@ -182,7 +193,7 @@ class ManifestDataFrame(metaclass=Singleton):
                     parentLocation = i.get_location()
             if parentLocation:
                 parentFileNames = [os.path.relpath(parentLocation, manifestDir)]
-            if not parentLocation:
+            else:
                 parentLocations = OnDiskFiles().get_scaffold_data().get_view_files()
                 parentFileNames = [os.path.relpath(parentLocation, manifestDir) for parentLocation in parentLocations]
 
@@ -209,11 +220,11 @@ class ManifestDataFrame(metaclass=Singleton):
     def update_column_content(self, file_location, column_name, content):
         # Update the cells with row: file_location, column: column_name to content
         fileDF = self.get_file_dataframe(file_location)
-
         for index, row in fileDF.iterrows():
             mDF = pd.read_excel(os.path.join(row["manifest_dir"], "manifest.xlsx"), sheet_name=row["sheet_name"])
             if column_name not in mDF.columns:
                 mDF[column_name] = ""
+
             mDF.loc[mDF["filename"] == row['filename'], column_name] = content
             mDF.to_excel(os.path.join(row["manifest_dir"], "manifest.xlsx"), sheet_name=row["sheet_name"], index=False, header=True)
 

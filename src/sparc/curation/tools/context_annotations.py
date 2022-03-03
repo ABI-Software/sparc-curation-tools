@@ -1,25 +1,50 @@
-import argparse
+import json
 import os
-import pandas as pd
+from pathlib import Path
 
-from sparc.curation.tools.definitions import ADDITIONAL_TYPES_COLUMN, SUPPLEMENTAL_JSON_COLUMN, CONTEXT_INFO_MIME
-from sparc.curation.tools.errors import AnnotationDirectoryNoWriteAccess
+from sparc.curation.tools.definitions import CONTEXT_INFO_MIME
 from sparc.curation.tools.manifests import ManifestDataFrame
-from sparc.curation.tools.ondisk import OnDiskFiles
-from sparc.curation.tools.utilities import convert_to_bytes, is_same_file
+from sparc.curation.tools.ondisk import is_json_of_type, is_csv_of_type, is_context_data_file, is_annotation_csv_file
 
 
-def write_context_info(data):
-    contextinfo_location = os.path.join(ManifestDataFrame().get_dataset_dir(), 'scaffoldcontextinfo.json')
-    print(contextinfo_location)
-    with open(contextinfo_location, 'w') as outfile:
+def get_context_info_file():
+    return os.path.join(ManifestDataFrame().get_dataset_dir(), "files", "derivative", "scaffold_context_info.json")
+
+
+def write_context_info(context_info_location, data):
+    with open(context_info_location, 'w') as outfile:
         json.dump(data, outfile, default=lambda o: o.__dict__, sort_keys=True, indent=2)
+
 
 def update_additional_type(file_location):
     ManifestDataFrame().update_additional_type(file_location, CONTEXT_INFO_MIME)
 
+
 def update_supplemental_json(file_location, annotation_data):
     ManifestDataFrame().update_supplemental_json(file_location, annotation_data)
 
+
 def update_anatomical_entity(file_location, annotation_data):
     ManifestDataFrame().update_anatomical_entity(file_location, annotation_data)
+
+
+def search_for_context_data_files(dataset_dir, max_size):
+    context_data_files = []
+    result = list(Path(dataset_dir).rglob("*"))
+    for r in result:
+        _is_context_data_file = is_json_of_type(r, max_size, is_context_data_file)
+        if _is_context_data_file:
+            context_data_files.append(r)
+
+    return context_data_files
+
+
+def search_for_annotation_csv_files(dataset_dir, max_size):
+    annotation_csv_files = []
+    result = list(Path(dataset_dir).rglob("*"))
+    for r in result:
+        _is_annotation_csv_file = is_csv_of_type(r, max_size, is_annotation_csv_file)
+        if _is_annotation_csv_file:
+            annotation_csv_files.append(r)
+
+    return annotation_csv_files

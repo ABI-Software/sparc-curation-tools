@@ -1,14 +1,11 @@
 import argparse
 import os
-import pandas as pd
 
 from sparc.curation.tools.errors import NotAnnotatedError, IncorrectAnnotationError, IncorrectDerivedFromError, IncorrectSourceOfError
-from sparc.curation.tools.definitions import ADDITIONAL_TYPES_COLUMN, SOURCE_OF_COLUMN, \
-    DERIVED_FROM_COLUMN, SCAFFOLD_VIEW_MIME, SCAFFOLD_THUMBNAIL_MIME, SCAFFOLD_FILE_MIME
 from sparc.curation.tools.errors import AnnotationDirectoryNoWriteAccess
 from sparc.curation.tools.manifests import ManifestDataFrame
 from sparc.curation.tools.ondisk import OnDiskFiles
-from sparc.curation.tools.utilities import convert_to_bytes, is_same_file
+from sparc.curation.tools.utilities import convert_to_bytes
 
 
 def check_additional_types_annotations():
@@ -36,6 +33,7 @@ def get_errors():
     errors.extend(check_derived_from_annotations())
     errors.extend(check_source_of_annotations())
     return errors
+
 
 def get_confirmation_message(error):
     """
