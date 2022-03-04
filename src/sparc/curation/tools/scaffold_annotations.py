@@ -68,7 +68,7 @@ def fix_error(error):
     elif isinstance(error, IncorrectDerivedFromError):
         ManifestDataFrame().update_derived_from(error.get_location(), error.get_mime())
     elif isinstance(error, IncorrectSourceOfError):
-        ManifestDataFrame().update_source_of_column(error.get_location(), error.get_mime())
+        ManifestDataFrame().update_source_of(error.get_location(), error.get_mime())
 
 
 def main():

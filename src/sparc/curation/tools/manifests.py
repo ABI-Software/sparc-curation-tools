@@ -4,15 +4,15 @@ from pathlib import Path
 import pandas as pd
 from sparc.curation.tools.annotations.scaffold import ScaffoldAnnotation
 from sparc.curation.tools.errors import IncorrectAnnotationError, NotAnnotatedError, IncorrectDerivedFromError, \
-    IncorrectSourceOfError
+    IncorrectSourceOfError, BadManifestError
 
 from sparc.curation.tools.base import Singleton
 from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN, FILENAME_COLUMN, SUPPLEMENTAL_JSON_COLUMN, \
-    ADDITIONAL_TYPES_COLUMN, ANATOMICAL_ENTITY_COLUMN, SCAFFOLD_FILE_MIME, SCAFFOLD_VIEW_MIME, \
-    SCAFFOLD_THUMBNAIL_MIME, SCAFFOLD_DIR_MIME, CONTEXT_INFO_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN
+    ADDITIONAL_TYPES_COLUMN, ANATOMICAL_ENTITY_COLUMN, SCAFFOLD_META_MIME, SCAFFOLD_VIEW_MIME, \
+    SCAFFOLD_THUMBNAIL_MIME, SCAFFOLD_DIR_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN, MANIFEST_DIR_COLUMN
 from sparc.curation.tools.ondisk import OnDiskFiles
 
-from sparc.curation.tools.utilities import convert_to_bytes, is_same_file
+from sparc.curation.tools.utilities import is_same_file
 
 
 class ManifestDataFrame(metaclass=Singleton):
@@ -24,7 +24,8 @@ class ManifestDataFrame(metaclass=Singleton):
     def setup_dataframe(self, dataset_dir):
         self._dataset_dir = dataset_dir
         self._read_manifests()
-        self.setup_data()
+        self._scaffold_data = ManifestDataFrame.Scaffold(self)
+        # self.setup_data()
         return self
 
     def _read_manifests(self, depth=0):
@@ -87,7 +88,7 @@ class ManifestDataFrame(metaclass=Singleton):
         return sanitised
 
     def setup_data(self):
-        self._scaffold_data = ManifestDataFrame.Scaffold()
+        self._scaffold_data = ManifestDataFrame.Scaffold(self)
         try:
             self._scaffold_data.set_scaffold_annotations(
                 [ScaffoldAnnotation(row) for i, row in self._manifestDataFrame[self._manifestDataFrame[ADDITIONAL_TYPES_COLUMN].notnull()].iterrows()]
@@ -106,10 +107,31 @@ class ManifestDataFrame(metaclass=Singleton):
         same_file = []
 
         for index, row in self._manifestDataFrame.iterrows():
-            location = os.path.join(row["manifest_dir"], row["filename"])
+            location = os.path.join(row[MANIFEST_DIR_COLUMN], row["filename"])
             same_file.append(is_same_file(file_location, location))
 
         return self._manifestDataFrame[same_file]
+
+    def get_matching_entry(self, column_heading, value, out_column_heading=FILENAME_COLUMN):
+        matching_files = []
+        for index, row in self._manifestDataFrame.iterrows():
+            if row[column_heading] == value:
+                matching_files.append(row[out_column_heading])
+
+        return matching_files
+
+    def get_filepath_on_disk(self, file_location):
+        filenames = self.get_matching_entry(FILENAME_COLUMN, file_location, FILE_LOCATION_COLUMN)
+        return filenames[0]
+
+    def scaffold_get_metadata_files(self):
+        return self.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_META_MIME)
+
+    def get_derived_from(self, file_location):
+        return self.get_matching_entry(DERIVED_FROM_COLUMN, file_location)
+
+    def get_source_of(self, file_location):
+        return self.get_matching_entry(SOURCE_OF_COLUMN, file_location)
 
     def get_file_dataframe(self, file_location):
         """
@@ -138,7 +160,7 @@ class ManifestDataFrame(metaclass=Singleton):
 
         return fileDF
 
-    def update_source_of_column(self, file_location, mime):
+    def update_source_of(self, file_location, mime):
         fileDF = self.get_file_dataframe(file_location)
         manifestDir = fileDF["manifest_dir"].iloc[0]
 
@@ -148,7 +170,7 @@ class ManifestDataFrame(metaclass=Singleton):
 
         viewNames = ""
         childrenLocations = []
-        if mime == SCAFFOLD_FILE_MIME:
+        if mime == SCAFFOLD_META_MIME:
             childrenLocations = OnDiskFiles().get_scaffold_data().get_metadata_children_files()[file_location]
             viewNames = [os.path.relpath(children, manifestDir) for children in childrenLocations]
 
@@ -178,7 +200,7 @@ class ManifestDataFrame(metaclass=Singleton):
         mDF = pd.read_excel(os.path.join(manifestDir, "manifest.xlsx"))
         parentMime = None
         if mime == SCAFFOLD_VIEW_MIME:
-            parentMime = SCAFFOLD_FILE_MIME
+            parentMime = SCAFFOLD_META_MIME
         elif mime == SCAFFOLD_THUMBNAIL_MIME:
             parentMime = SCAFFOLD_VIEW_MIME
         parentFileNames = mDF["filename"][mDF[ADDITIONAL_TYPES_COLUMN] == parentMime].tolist()
@@ -202,7 +224,7 @@ class ManifestDataFrame(metaclass=Singleton):
             parentLocations = []
             if parentMime == SCAFFOLD_VIEW_MIME:
                 parentLocations = OnDiskFiles().get_scaffold_data().get_view_files()
-            elif parentMime == SCAFFOLD_FILE_MIME:
+            elif parentMime == SCAFFOLD_META_MIME:
                 parentLocations = OnDiskFiles().get_scaffold_data().get_metadata_files()
             parentFileNames = [os.path.relpath(parentLocation, manifestDir) for parentLocation in parentLocations]
 
@@ -234,6 +256,9 @@ class ManifestDataFrame(metaclass=Singleton):
             'locations': [],
         }
 
+        def __init__(self, parent):
+            self._parent = parent
+
         def set_scaffold_annotations(self, annotations):
             self._data['annotations'] = annotations
 
@@ -247,21 +272,13 @@ class ManifestDataFrame(metaclass=Singleton):
             return self._data['locations']
 
         def get_metadata_filenames(self):
-            filenames = []
-            for i in self._data['annotations']:
-                if i.get_additional_type() == SCAFFOLD_FILE_MIME:
-                    filenames.append(i.get_location())
+            return self._parent.scaffold_get_metadata_files()
 
-            return filenames
+        def get_derived_from_filenames(self, source):
+            return self._parent.get_derived_from(source)
 
-        def get_derived_filenames(self, source):
-            for i in self._data['annotations']:
-                if i.get_location() == source:
-                    return i.get_children()
-                # if i.get_parent() == source:
-                #     return i.get_location()
-
-            return []
+        def get_source_of_filenames(self, source):
+            return self._parent.get_source_of(source)
 
         def get_missing_annotations(self, on_disk):
             errors = []
@@ -270,16 +287,19 @@ class ManifestDataFrame(metaclass=Singleton):
             on_disk_view_files = on_disk.get_scaffold_data().get_view_files()
             on_disk_thumbnail_files = on_disk.get_scaffold_data().get_thumbnail_files()
 
+            manifest_metadata_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_META_MIME, FILE_LOCATION_COLUMN)
             for i in on_disk_metadata_files:
-                if i not in self._data['locations']:
-                    errors.append(NotAnnotatedError(i, SCAFFOLD_FILE_MIME))
+                if i not in manifest_metadata_files:
+                    errors.append(NotAnnotatedError(i, SCAFFOLD_META_MIME))
 
+            manifest_view_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_VIEW_MIME, FILE_LOCATION_COLUMN)
             for i in on_disk_view_files:
-                if i not in self._data['locations']:
+                if i not in manifest_view_files:
                     errors.append(NotAnnotatedError(i, SCAFFOLD_VIEW_MIME))
 
+            manifest_thumbnail_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_THUMBNAIL_MIME, FILE_LOCATION_COLUMN)
             for i in on_disk_thumbnail_files:
-                if i not in self._data['locations']:
+                if i not in manifest_thumbnail_files:
                     errors.append(NotAnnotatedError(i, SCAFFOLD_THUMBNAIL_MIME))
 
             return errors
@@ -291,21 +311,42 @@ class ManifestDataFrame(metaclass=Singleton):
             on_disk_view_files = on_disk.get_scaffold_data().get_view_files()
             on_disk_thumbnail_files = on_disk.get_scaffold_data().get_thumbnail_files()
 
-            for i in self._data['annotations']:
-                if i.get_additional_type() == SCAFFOLD_FILE_MIME:
-                    if i.get_location() not in on_disk_metadata_files:
-                        errors.append(IncorrectAnnotationError(i.get_location(), i.get_additional_type()))
+            manifest_metadata_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_META_MIME, FILE_LOCATION_COLUMN)
+            manifest_view_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_VIEW_MIME, FILE_LOCATION_COLUMN)
+            manifest_thumbnail_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_THUMBNAIL_MIME, FILE_LOCATION_COLUMN)
+            manifest_directory_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_DIR_MIME, FILE_LOCATION_COLUMN)
 
-                if i.get_additional_type() == SCAFFOLD_VIEW_MIME:
-                    if i.get_location() not in on_disk_view_files:
-                        errors.append(IncorrectAnnotationError(i.get_location(), i.get_additional_type()))
+            for i in manifest_metadata_files:
+                if i not in on_disk_metadata_files:
+                    errors.append(IncorrectAnnotationError(i, SCAFFOLD_META_MIME))
 
-                if i.get_additional_type() == SCAFFOLD_THUMBNAIL_MIME:
-                    if i.get_location() not in on_disk_thumbnail_files:
-                        errors.append(IncorrectAnnotationError(i.get_location(), i.get_additional_type()))
+            for i in manifest_view_files:
+                if i not in on_disk_view_files:
+                    errors.append(IncorrectAnnotationError(i, SCAFFOLD_VIEW_MIME))
 
-                if i.get_additional_type() == SCAFFOLD_DIR_MIME:
-                    errors.append(IncorrectAnnotationError(i.get_location(), i.get_additional_type()))
+            for i in manifest_thumbnail_files:
+                if i not in on_disk_thumbnail_files:
+                    errors.append(IncorrectAnnotationError(i, SCAFFOLD_THUMBNAIL_MIME))
+
+            for i in manifest_directory_files:
+                errors.append(IncorrectAnnotationError(i, SCAFFOLD_DIR_MIME))
+
+            return errors
+
+        def _process_incorrect_derived_from(self, on_disk_files, on_disk_parent_files, manifest_files, incorrect_mime):
+            errors = []
+
+            for i in manifest_files:
+                manifest_view_derived_from = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, i, DERIVED_FROM_COLUMN)
+                manifest_view_derived_from_files = []
+                for j in manifest_view_derived_from:
+                    derived_from_files = self._parent.get_matching_entry(FILENAME_COLUMN, j, FILE_LOCATION_COLUMN)
+                    manifest_view_derived_from_files.extend(derived_from_files)
+
+                if len(manifest_view_derived_from_files) == 1:
+                    if i in on_disk_files and manifest_view_derived_from_files[0] not in on_disk_parent_files:
+                        errors.append(IncorrectDerivedFromError(i, incorrect_mime))
+
             return errors
 
         def get_incorrect_derived_from(self, on_disk):
@@ -315,15 +356,34 @@ class ManifestDataFrame(metaclass=Singleton):
             on_disk_view_files = on_disk.get_scaffold_data().get_view_files()
             on_disk_thumbnail_files = on_disk.get_scaffold_data().get_thumbnail_files()
 
-            for i in self._data['annotations']:
+            manifest_view_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_VIEW_MIME, FILE_LOCATION_COLUMN)
+            manifest_thumbnail_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_THUMBNAIL_MIME, FILE_LOCATION_COLUMN)
 
-                if i.get_additional_type() == SCAFFOLD_VIEW_MIME:
-                    if i.get_location() in on_disk_view_files and i.get_parent() not in on_disk_metadata_files:
-                        errors.append(IncorrectDerivedFromError(i.get_location(), SCAFFOLD_VIEW_MIME))
+            view_derived_from_errors = self._process_incorrect_derived_from(on_disk_view_files, on_disk_metadata_files, manifest_view_files, SCAFFOLD_VIEW_MIME)
+            errors.extend(view_derived_from_errors)
 
-                if i.get_additional_type() == SCAFFOLD_THUMBNAIL_MIME:
-                    if i.get_location() in on_disk_thumbnail_files and i.get_parent() not in on_disk_view_files:
-                        errors.append(IncorrectDerivedFromError(i.get_location(), SCAFFOLD_THUMBNAIL_MIME))
+            thumbnail_derived_from_errors = self._process_incorrect_derived_from(on_disk_thumbnail_files, on_disk_view_files, manifest_thumbnail_files, SCAFFOLD_THUMBNAIL_MIME)
+            errors.extend(thumbnail_derived_from_errors)
+
+            return errors
+
+        def _process_incorrect_source_of(self, on_disk_files, on_disk_child_files, manifest_files, incorrect_mime):
+            errors = []
+
+            for i in manifest_files:
+                if i in on_disk_files:
+                    manifest_source_of = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, i, SOURCE_OF_COLUMN)
+                    if len(manifest_source_of) == 0:
+                        errors.append(IncorrectSourceOfError(i, incorrect_mime))
+                    elif len(manifest_source_of) == 1:
+                        source_of_files_list = []
+                        source_ofs = manifest_source_of[0].split("\n")
+                        for source_of in source_ofs:
+                            source_of_files = self._parent.get_matching_entry(FILENAME_COLUMN, source_of, FILE_LOCATION_COLUMN)
+                            source_of_files_list.extend(source_of_files)
+
+                        if not all([item in on_disk_child_files for item in source_of_files_list]):
+                            errors.append(IncorrectSourceOfError(i, incorrect_mime))
 
             return errors
 
@@ -331,25 +391,16 @@ class ManifestDataFrame(metaclass=Singleton):
             errors = []
 
             on_disk_metadata_files = on_disk.get_scaffold_data().get_metadata_files()
-            on_disk_metadata_children_files = on_disk.get_scaffold_data().get_metadata_children_files()
             on_disk_view_files = on_disk.get_scaffold_data().get_view_files()
             on_disk_thumbnail_files = on_disk.get_scaffold_data().get_thumbnail_files()
 
-            for i in self._data['annotations']:
+            manifest_metadata_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_META_MIME, FILE_LOCATION_COLUMN)
+            manifest_view_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_VIEW_MIME, FILE_LOCATION_COLUMN)
 
-                if i.get_additional_type() == SCAFFOLD_FILE_MIME:
-                    if i.get_location() in on_disk_metadata_files:
-                        if not i.get_children():
-                            errors.append(IncorrectSourceOfError(i.get_location(), SCAFFOLD_FILE_MIME))
-                        elif not set(i.get_children()) == set(on_disk_metadata_children_files[i.get_location()]):
-                            errors.append(IncorrectSourceOfError(i.get_location(), SCAFFOLD_FILE_MIME))
+            metadata_source_of_errors = self._process_incorrect_source_of(on_disk_metadata_files, on_disk_view_files, manifest_metadata_files, SCAFFOLD_META_MIME)
+            errors.extend(metadata_source_of_errors)
 
-                if i.get_additional_type() == SCAFFOLD_VIEW_MIME:
-                    # Program to check the on_disk_thumbnail_files list contains all elements of i.get_children()
-                    if i.get_location() in on_disk_view_files:
-                        if not i.get_children():
-                            errors.append(IncorrectSourceOfError(i.get_location(), SCAFFOLD_VIEW_MIME))
-                        elif not all(item in on_disk_thumbnail_files for item in i.get_children()):
-                            errors.append(IncorrectSourceOfError(i.get_location(), SCAFFOLD_VIEW_MIME))
+            view_source_of_errors = self._process_incorrect_source_of(on_disk_view_files, on_disk_thumbnail_files, manifest_view_files, SCAFFOLD_VIEW_MIME)
+            errors.extend(view_source_of_errors)
 
             return errors
