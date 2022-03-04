@@ -28,20 +28,30 @@ class NotAnnotatedError(ScaffoldAnnotationError):
         super(NotAnnotatedError, self).__init__(message, location, mime)
 
 
-class IncorrectSourceOfError(ScaffoldAnnotationError):
-    def __init__(self, location, mime):
+class IncorrectBaseError(ScaffoldAnnotationError):
+
+    def __init__(self, message, location, mime, target):
+        super(IncorrectBaseError, self).__init__(message, location, mime)
+        self._target = target
+
+    def get_target(self):
+        return self._target
+
+
+class IncorrectSourceOfError(IncorrectBaseError):
+    def __init__(self, location, mime, target):
         fileType = MIMETYPE_TO_FILETYPE_MAP.get(mime, 'unknown')
         childrenFileType = MIMETYPE_TO_CHILDREN_FILETYPE_MAP.get(mime, 'unknown')
         message = f"Found '{fileType}' file '{location}' either has no {childrenFileType} file or it's annotated to an incorrect file."
-        super(IncorrectSourceOfError, self).__init__(message, location, mime)
+        super(IncorrectSourceOfError, self).__init__(message, location, mime, target)
 
 
-class IncorrectDerivedFromError(ScaffoldAnnotationError):
-    def __init__(self, location, mime):
+class IncorrectDerivedFromError(IncorrectBaseError):
+    def __init__(self, location, mime, target):
         fileType = MIMETYPE_TO_FILETYPE_MAP.get(mime, 'unknown')
         parentFileType = MIMETYPE_TO_PARENT_FILETYPE_MAP.get(mime, 'unknown')
         message = f"Found '{fileType}' file '{location}' either has no derived from file or it's not derived from a scaffold '{parentFileType}' file."
-        super(IncorrectDerivedFromError, self).__init__(message, location, mime)
+        super(IncorrectDerivedFromError, self).__init__(message, location, mime, target)
 
 
 class IncorrectAnnotationError(ScaffoldAnnotationError):
