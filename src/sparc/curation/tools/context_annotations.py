@@ -1,5 +1,6 @@
 import argparse
 import os
+import json
 import pandas as pd
 
 from sparc.curation.tools.definitions import ADDITIONAL_TYPES_COLUMN, SUPPLEMENTAL_JSON_COLUMN, CONTEXT_INFO_MIME
@@ -9,9 +10,12 @@ from sparc.curation.tools.ondisk import OnDiskFiles
 from sparc.curation.tools.utilities import convert_to_bytes, is_same_file
 
 
-def write_context_info(data):
-    contextinfo_location = os.path.join(ManifestDataFrame().get_dataset_dir(), 'scaffoldcontextinfo.json')
-    print(contextinfo_location)
+def read_context_info(contextinfo_location, data):
+    with open(contextinfo_location, 'r') as outfile:
+        data = json.load(outfile, default=lambda o: o.__dict__, sort_keys=True, indent=2)
+    return data
+
+def write_context_info(contextinfo_location, data):
     with open(contextinfo_location, 'w') as outfile:
         json.dump(data, outfile, default=lambda o: o.__dict__, sort_keys=True, indent=2)
 
