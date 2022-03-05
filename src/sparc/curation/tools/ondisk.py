@@ -1,3 +1,4 @@
+import csv
 import json
 import os
 from pathlib import Path
@@ -55,6 +56,33 @@ def test_for_view(json_data):
     return is_view
 
 
+def is_context_data_file(json_data):
+    if json_data:
+        if isinstance(json_data, dict):
+            # "version" and "id" are required keys for a context data file.
+            if "version" in json_data and "id" in json_data:
+                return json_data["id"] == "sparc.science.context_data"
+
+    return False
+
+
+def is_annotation_csv_file(csv_reader):
+    if csv_reader:
+        first = True
+        for row in csv_reader:
+            if first:
+                if len(row) == 2 and row[0] == "Term ID" and row[1] == "Group name":
+                    first = False
+                else:
+                    return False
+            elif len(row) != 2:
+                return False
+
+        return True
+
+    return False
+
+
 def is_json_of_type(r, max_size, test_func):
     result = False
     if os.path.getsize(r) < max_size and os.path.isfile(r):
@@ -73,6 +101,24 @@ def is_json_of_type(r, max_size, test_func):
             return result
 
     return result
+
+
+def is_csv_of_type(r, max_size, test_func):
+    result = False
+    if os.path.getsize(r) < max_size and os.path.isfile(r):
+        try:
+            with open(r, encoding='utf-8') as f:
+                csv_reader = csv.reader(f)
+                result = test_func(csv_reader)
+        except UnicodeDecodeError:
+            return result
+        except IsADirectoryError:
+            return result
+        except csv.Error:
+            return result
+
+    return result
+
 
 def get_view_urls(metadata_file):
     view_urls = []
@@ -93,6 +139,7 @@ def get_view_urls(metadata_file):
         return view_urls
 
     return view_urls
+
 
 def search_for_metadata_files(dataset_dir, max_size):
     metadata = []

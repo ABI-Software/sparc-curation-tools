@@ -1,14 +1,12 @@
 import argparse
 import os
-import pandas as pd
 
+from sparc.curation.tools.definitions import MANIFEST_DIR_COLUMN
 from sparc.curation.tools.errors import NotAnnotatedError, IncorrectAnnotationError, IncorrectDerivedFromError, IncorrectSourceOfError
-from sparc.curation.tools.definitions import ADDITIONAL_TYPES_COLUMN, SOURCE_OF_COLUMN, \
-    DERIVED_FROM_COLUMN, SCAFFOLD_VIEW_MIME, SCAFFOLD_THUMBNAIL_MIME, SCAFFOLD_FILE_MIME
 from sparc.curation.tools.errors import AnnotationDirectoryNoWriteAccess
 from sparc.curation.tools.manifests import ManifestDataFrame
 from sparc.curation.tools.ondisk import OnDiskFiles
-from sparc.curation.tools.utilities import convert_to_bytes, is_same_file
+from sparc.curation.tools.utilities import convert_to_bytes
 
 
 def check_additional_types_annotations():
@@ -17,15 +15,18 @@ def check_additional_types_annotations():
     errors += ManifestDataFrame().get_scaffold_data().get_incorrect_annotations(OnDiskFiles())
     return errors
 
+
 def check_derived_from_annotations():
     errors = []
     errors += ManifestDataFrame().get_scaffold_data().get_incorrect_derived_from(OnDiskFiles())
     return errors
 
+
 def check_source_of_annotations():
     errors = []
     errors.extend(ManifestDataFrame().get_scaffold_data().get_incorrect_source_of(OnDiskFiles()))
     return errors
+
 
 def get_errors():
     errors = []
@@ -34,7 +35,8 @@ def get_errors():
     errors.extend(check_source_of_annotations())
     return errors
 
-def get_confirmation_message(error):
+
+def get_confirmation_message(error=None):
     """
     "To fix this error, the 'additional types' of 'filename' in 'manifestFile' will be set to 'MIME'."
     "To fix this error, a manifestFile will be created under manifestDir, and will insert the filename in this manifestFile with 'additional types' MIME."
@@ -42,8 +44,12 @@ def get_confirmation_message(error):
     "To fix this error, the data of filename in manifestFile will be deleted."
     # TODO or NOT TODO: return different message based on input error type
     """
-    message = "Let this magic tool fix this error for you."
+    if error is None:
+        return "Let this magic tool fix all errors for you?"
+
+    message = "Let this magic tool fix this error for you?"
     return message
+
 
 def fix_error(error):
     checked_locations = []
@@ -52,21 +58,22 @@ def fix_error(error):
     if manifest.empty:
         ManifestDataFrame().create_manifest(error.get_location())
     else:
-        for manifest_dir in manifest['manifest_dir']:
+        for manifest_dir in manifest[MANIFEST_DIR_COLUMN]:
             if manifest_dir not in checked_locations:
                 checked_locations.append(manifest_dir)
                 if not os.access(manifest_dir, os.W_OK):
                     raise AnnotationDirectoryNoWriteAccess(f"Cannot write to directory {manifest_dir}.")
 
-    # Check incorrect annotation before no annotation
+    # Check incorrect annotation before no annotation.
     if isinstance(error, IncorrectAnnotationError):
         ManifestDataFrame().update_additional_type(error.get_location(), None)
     elif isinstance(error, NotAnnotatedError):
         ManifestDataFrame().update_additional_type(error.get_location(), error.get_mime())
     elif isinstance(error, IncorrectDerivedFromError):
-        ManifestDataFrame().update_derived_from(error.get_location(), error.get_mime())
+        ManifestDataFrame().get_scaffold_data().update_derived_from(error.get_location(), error.get_mime(), error.get_target())
     elif isinstance(error, IncorrectSourceOfError):
-        ManifestDataFrame().update_source_of_column(error.get_location(), error.get_mime())
+        ManifestDataFrame().get_scaffold_data().update_source_of(error.get_location(), error.get_mime(), error.get_target())
+
 
 def main():
     parser = argparse.ArgumentParser(description='Check scaffold annotations for a SPARC dataset.')

@@ -3,16 +3,7 @@ import math
 import os
 import re
 
-import pandas as pd
 from sparc.curation.tools.definitions import SIZE_NAME
-
-
-def is_samefile(loc1, loc2):
-    if pd.notnull(loc2):
-        if os.path.isfile(loc2):
-            return os.path.samefile(loc1, loc2)
-
-    return False
 
 
 def convert_size(size_bytes):
