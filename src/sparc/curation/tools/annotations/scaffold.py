@@ -1,68 +1,7 @@
 import os
 
-from sparc.curation.tools.definitions import MIMETYPE_TO_FILETYPE_MAP, MIMETYPE_TO_PARENT_FILETYPE_MAP, FILE_LOCATION_COLUMN, MANIFEST_DIR_COLUMN, FILENAME_COLUMN, ADDITIONAL_TYPES_COLUMN, SOURCE_OF_COLUMN, \
-    DERIVED_FROM_COLUMN
-
-
-class ScaffoldAnnotationError(object):
-
-    def __init__(self, message, location):
-        self._message = message
-        self._location = location
-
-    def get_location(self):
-        return self._location
-
-    def get_error_message(self):
-        return f'Error: {self._message}'
-
-    # def __str__(self):
-    #     return f'Error: {self._message}'
-
-
-class NotAnnotatedError(ScaffoldAnnotationError):
-    def __init__(self, location, mime):
-        self._mime = mime
-        fileType = MIMETYPE_TO_FILETYPE_MAP.get(mime, 'unknown')
-        message = f"Found Scaffold '{fileType}' file that is not annotated '{location}'."
-        super(NotAnnotatedError, self).__init__(message, location)
-
-    def get_mime(self):
-        return self._mime
-
-
-class NoViewError(ScaffoldAnnotationError):
-    def __init__(self, location):
-        message = f"Found scaffold metadata file that has no view '{location}'."
-        super(NoViewError, self).__init__(message, location)
-
-
-class NoThumbnailError(ScaffoldAnnotationError):
-    def __init__(self, location):
-        message = f"Found scaffold view file that has no thumbnail '{location}'."
-        super(NoThumbnailError, self).__init__(message, location)
-
-class IncorrectDerivedFromError(ScaffoldAnnotationError):
-    def __init__(self, location, mime):
-        self._mime = mime
-        fileType = MIMETYPE_TO_FILETYPE_MAP.get(mime, 'unknown')
-        parentFileType = MIMETYPE_TO_PARENT_FILETYPE_MAP.get(mime, 'unknown')
-        message = f"Found '{fileType}' file '{location}' either has no derived from file or it's not derived from a scaffold '{parentFileType}' file."
-        super(IncorrectDerivedFromError, self).__init__(message, location)
-
-    def get_mime(self):
-        return self._mime
-
-
-class IncorrectAnnotationError(ScaffoldAnnotationError):
-    def __init__(self, location, mime):
-        self._mime = mime
-        fileType = MIMETYPE_TO_FILETYPE_MAP.get(mime, 'unknown')
-        message = f"File '{location}' either does not exist or is not a scaffold '{fileType}' file."
-        super(IncorrectAnnotationError, self).__init__(message, location)
-
-    def get_mime(self):
-        return self._mime
+from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN, MANIFEST_DIR_COLUMN, FILENAME_COLUMN, \
+    ADDITIONAL_TYPES_COLUMN, SOURCE_OF_COLUMN, DERIVED_FROM_COLUMN
 
 
 class ScaffoldAnnotation(object):
@@ -77,8 +16,8 @@ class ScaffoldAnnotation(object):
         self._fileName = dataframe_row[FILENAME_COLUMN]
         self._location = dataframe_row[FILE_LOCATION_COLUMN]
         self._additionalType = None
-        self._children = None
-        self._parent = None
+        self._children = []
+        self._parent = []
 
         if ADDITIONAL_TYPES_COLUMN in dataframe_row:
             if isinstance(dataframe_row[ADDITIONAL_TYPES_COLUMN], str):
@@ -91,6 +30,8 @@ class ScaffoldAnnotation(object):
         if DERIVED_FROM_COLUMN in dataframe_row:
             if isinstance(dataframe_row[DERIVED_FROM_COLUMN], str):
                 self._parent = str(os.path.join(self._manifestDir, dataframe_row[DERIVED_FROM_COLUMN]))
+                # Is it possible one file can have multiple derivedFrom files
+                # self._parent = [str(os.path.join(self._manifestDir, filename)) for filename in dataframe_row[DERIVED_FROM_COLUMN].split(',')]
 
     def get_location(self):
         return os.path.normpath(os.path.join(self._location))
