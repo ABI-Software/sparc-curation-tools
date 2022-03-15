@@ -1,7 +1,5 @@
 import json
 import os
-import json
-import pandas as pd
 from pathlib import Path
 
 from sparc.curation.tools.definitions import CONTEXT_INFO_MIME
@@ -26,10 +24,6 @@ def get_context_info_file():
 def get_context_info_dir():
     return os.path.dirname(get_context_info_file())
 
-def read_context_info(contextinfo_location, data):
-    with open(contextinfo_location, 'r') as outfile:
-        data = json.load(outfile, default=lambda o: o.__dict__, sort_keys=True, indent=2)
-    return data
 
 def write_context_info(context_info_location, data):
     with open(context_info_location, 'w') as outfile:
