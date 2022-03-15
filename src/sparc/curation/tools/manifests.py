@@ -147,7 +147,7 @@ class ManifestDataFrame(metaclass=Singleton):
             # If no manifest file create new manifest file. Add file to the manifest.
             if not manifestDataFrame[manifestDataFrame[MANIFEST_DIR_COLUMN] == file_dir].empty:
                 mDF = pd.read_excel(os.path.join(file_dir, MANIFEST_FILENAME))
-                newRow = mDF.append(newRow, ignore_index=True)
+                newRow = mDF.concat(newRow, ignore_index=True)
             newRow.to_excel(os.path.join(file_dir, MANIFEST_FILENAME), index=False, header=True)
 
             # Re-read manifests to find dataframe for newly added entry.

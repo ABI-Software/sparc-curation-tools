@@ -9,10 +9,22 @@ from sparc.curation.tools.manifests import ManifestDataFrame
 from sparc.curation.tools.ondisk import is_json_of_type, is_csv_of_type, is_context_data_file, is_annotation_csv_file
 
 
+def get_dataset_dir():
+    return ManifestDataFrame().get_dataset_dir()
 
 
 def get_context_info_file():
-    return os.path.join(ManifestDataFrame().get_dataset_dir(), "files", "derivative", "scaffold_context_info.json")
+    dataset_dir = ManifestDataFrame().get_dataset_dir()
+    context_info_dir = dataset_dir
+    if os.path.exists(os.path.join(dataset_dir, "files")):
+        dataset_dir = os.path.join(dataset_dir, "files")
+    if os.path.exists(os.path.join(dataset_dir, "derivative")):
+        context_info_dir = os.path.join(dataset_dir, "derivative")
+    return os.path.join(context_info_dir, "scaffold_context_info.json")
+
+
+def get_context_info_dir():
+    return os.path.dirname(get_context_info_file())
 
 def read_context_info(contextinfo_location, data):
     with open(contextinfo_location, 'r') as outfile:
