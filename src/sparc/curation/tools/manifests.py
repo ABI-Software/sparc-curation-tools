@@ -174,9 +174,11 @@ class ManifestDataFrame(metaclass=Singleton):
                 mDF[column_name] = ""
 
             if append:
-                content = "\n".join([mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name], content])
+                mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name] = mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name] + "\n" + content
+                mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name] = mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name].fillna(content)
+            else:
+                mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name] = content
 
-            mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name] = content
             mDF.to_excel(os.path.join(row[MANIFEST_DIR_COLUMN], MANIFEST_FILENAME), sheet_name=row[SHEET_NAME_COLUMN], index=False, header=True)
 
     class Scaffold(object):
@@ -194,7 +196,7 @@ class ManifestDataFrame(metaclass=Singleton):
                         target_filenames.extend(self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN))
 
             elif mime == SCAFFOLD_THUMBNAIL_MIME:
-                target_filenames = ["nothing matched"]
+                target_filenames = []
                 for t in target:
                     target_manifest = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, MANIFEST_DIR_COLUMN)
                     if source_manifest == target_manifest:
@@ -203,7 +205,7 @@ class ManifestDataFrame(metaclass=Singleton):
                             target_filenames = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN)
 
             if len(target_filenames) == 0:
-                target_filenames = ["failed to find a suitable source"]
+                target_filenames = []
 
             self._parent.update_column_content(file_location, DERIVED_FROM_COLUMN, "\n".join(target_filenames))
 
@@ -217,7 +219,7 @@ class ManifestDataFrame(metaclass=Singleton):
                         target_filenames.extend(self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN))
 
             elif mime == SCAFFOLD_VIEW_MIME:
-                target_filenames = ["nothing matched"]
+                target_filenames = []
                 for t in target:
                     target_manifest = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, MANIFEST_DIR_COLUMN)
                     if source_manifest == target_manifest:
@@ -226,7 +228,7 @@ class ManifestDataFrame(metaclass=Singleton):
                             target_filenames = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN)
 
             if len(target_filenames) == 0:
-                target_filenames = ["failed to find a suitable source"]
+                target_filenames = []
 
             self._parent.update_column_content(file_location, SOURCE_OF_COLUMN, "\n".join(target_filenames))
 
@@ -334,9 +336,9 @@ class ManifestDataFrame(metaclass=Singleton):
             for i in manifest_files:
                 if i in on_disk_files:
                     manifest_source_of = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, i, SOURCE_OF_COLUMN)
-                    if len(manifest_source_of) == 0:
+                    if pd.isna(manifest_source_of):
                         errors.append(IncorrectSourceOfError(i, incorrect_mime, on_disk_child_files))
-                    elif len(manifest_source_of) == 1:
+                    else:
                         source_of_files_list = []
                         source_ofs = manifest_source_of[0].split("\n")
                         for source_of in source_ofs:
