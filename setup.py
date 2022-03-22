@@ -37,13 +37,13 @@ requires = ['pandas', 'openpyxl']
 setup(
     name='sparc-curation-tools',
     version=version,
-    description='A collection of tools to help with curating SPARC datasets..',
+    description='A collection of tools to help with curating SPARC datasets.',
     long_description='\n'.join(readme) + software_licence,
     long_description_content_type='text/x-rst',
     classifiers=[],
     author='Hugh Sorby',
     author_email='h.sorby@auckland.ac.nz',
-    url='https://github.com/hsorby/sparc-curation-tools.git',
+    url='https://github.com/ABI-Software/sparc-curation-tools.git',
     license='Apache Software License',
     license_files=("LICENSE",),
     packages=find_packages("src"),
@@ -51,7 +51,7 @@ setup(
     entry_points={
         "console_scripts": [
             "scaffold-annotations = sparc.curation.tools.scaffold_annotations:main",
-            "plot-annotation = sparc.curation.tools.plot_annotation:main"
+            "plot-annotation = sparc.curation.tools.plot_annotations:main"
         ]
     },
     include_package_data=True,
