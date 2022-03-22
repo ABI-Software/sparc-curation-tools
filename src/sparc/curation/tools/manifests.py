@@ -147,7 +147,7 @@ class ManifestDataFrame(metaclass=Singleton):
             # If no manifest file create new manifest file. Add file to the manifest.
             if not manifestDataFrame[manifestDataFrame[MANIFEST_DIR_COLUMN] == file_dir].empty:
                 mDF = pd.read_excel(os.path.join(file_dir, MANIFEST_FILENAME))
-                newRow = mDF.concat(newRow, ignore_index=True)
+                newRow = mDF.append(newRow, ignore_index=True)
             newRow.to_excel(os.path.join(file_dir, MANIFEST_FILENAME), index=False, header=True)
 
             # Re-read manifests to find dataframe for newly added entry.
@@ -336,9 +336,9 @@ class ManifestDataFrame(metaclass=Singleton):
             for i in manifest_files:
                 if i in on_disk_files:
                     manifest_source_of = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, i, SOURCE_OF_COLUMN)
-                    if pd.isna(manifest_source_of):
+                    if pd.isna(manifest_source_of) or len(manifest_source_of) == 0:
                         errors.append(IncorrectSourceOfError(i, incorrect_mime, on_disk_child_files))
-                    else:
+                    elif len(manifest_source_of) == 1:
                         source_of_files_list = []
                         source_ofs = manifest_source_of[0].split("\n")
                         for source_of in source_ofs:
