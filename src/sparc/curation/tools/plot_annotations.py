@@ -1,6 +1,11 @@
+import os
 import re
 import argparse
 import json
+
+from sparc.curation.tools.manifests import ManifestDataFrame
+from sparc.curation.tools.ondisk import OnDiskFiles
+from sparc.curation.tools.utilities import convert_to_bytes
 
 VERSION = '1.2.0'
 AVAILABLE_PLOT_TYPES = ['heatmap', 'timeseries']
@@ -29,6 +34,14 @@ def flatten_nested_list(nested_list):
             flat_list.append(elem)
     return flat_list
 
+def annotate_plot(dataset_dir, data):
+    max_size = '2MiB'
+    manifest_dir = os.path.join(dataset_dir, "primary")
+    OnDiskFiles().setup_dataset(dataset_dir, convert_to_bytes(max_size))
+    ManifestDataFrame().setup_dataframe(dataset_dir)
+    plot_files = OnDiskFiles().get_plot_files()
+    for plot_file in plot_files:
+        ManifestDataFrame().update_plot_annotation(manifest_dir, plot_file, data)
 
 def main():
     parser = argparse.ArgumentParser(description='Create an annotation for a SPARC plot. '
@@ -36,6 +49,7 @@ def main():
                                                  'The start and end numbers are included in the range. '
                                                  'The -y/--y-axes-columns argument will consume the positional plot type argument. '
                                                  'That means the positional argument cannot follow the -y/--y-axes-columns.')
+    parser.add_argument("dataset_dir", help='dataset dir')
     parser.add_argument("plot_type", help='must define a plot type which is one of; ' + ', '.join(AVAILABLE_PLOT_TYPES) + '.',
                         choices=AVAILABLE_PLOT_TYPES)
     parser.add_argument("-x", "--x-axis-column", help="integer index for the independent column (zero based). Default is 0.",
@@ -51,6 +65,7 @@ def main():
                         default='comma', choices=AVAILABLE_DELIMITERS)
 
     args = parser.parse_args()
+    dataset_dir = args.dataset_dir
     attrs = {
         'style': args.plot_type,
     }
@@ -75,6 +90,7 @@ def main():
         'attrs': attrs
     }
     print(json.dumps(data))
+    annotate_plot(dataset_dir, json.dumps(data))
 
 
 main()

@@ -9,7 +9,7 @@ from sparc.curation.tools.errors import IncorrectAnnotationError, NotAnnotatedEr
 from sparc.curation.tools.base import Singleton
 from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN, FILENAME_COLUMN, SUPPLEMENTAL_JSON_COLUMN, \
     ADDITIONAL_TYPES_COLUMN, ANATOMICAL_ENTITY_COLUMN, SCAFFOLD_META_MIME, SCAFFOLD_VIEW_MIME, \
-    SCAFFOLD_THUMBNAIL_MIME, SCAFFOLD_DIR_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN, MANIFEST_DIR_COLUMN, MANIFEST_FILENAME, SHEET_NAME_COLUMN
+    SCAFFOLD_THUMBNAIL_MIME, SCAFFOLD_DIR_MIME, PLOT_CSV_MIME, PLOT_TSV_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN, MANIFEST_DIR_COLUMN, MANIFEST_FILENAME, SHEET_NAME_COLUMN
 from sparc.curation.tools.utilities import is_same_file
 
 
@@ -156,6 +156,31 @@ class ManifestDataFrame(metaclass=Singleton):
 
         return fileDF
 
+    def update_plot_annotation(self, manifest_dir, file_location, data):
+        manifestDataFrame = self._manifestDataFrame
+        file_name = os.path.relpath(file_location, manifest_dir)
+
+        # Search data rows to find match to the same file by file_location.
+        fileDF = self._get_matching_dataframe(file_location)
+
+        # If fileDF is empty, means there's no manifest file containing this file's annotation.
+        if fileDF.empty:
+            newRow = pd.DataFrame({FILENAME_COLUMN: file_name}, index=[1])
+            # Check if there's manifest file under same Scaffold File Dir. If yes get data from it.
+            # If no manifest file create new manifest file. Add file to the manifest.
+            if not manifestDataFrame[manifestDataFrame[MANIFEST_DIR_COLUMN] == manifest_dir].empty:
+                mDF = pd.read_excel(os.path.join(manifest_dir, MANIFEST_FILENAME))
+                newRow = pd.concat([mDF, newRow], ignore_index=True)
+            newRow.to_excel(os.path.join(manifest_dir, MANIFEST_FILENAME), index=False, header=True)
+
+            # Re-read manifests to find dataframe for newly added entry.
+            self._read_manifests()
+            fileDF = self._get_matching_dataframe(file_location)
+
+        self.update_additional_type(file_location, PLOT_CSV_MIME)
+        
+        self.update_supplemental_json(file_location, data)
+
     def update_additional_type(self, file_location, file_mime):
         self.update_column_content(file_location, ADDITIONAL_TYPES_COLUMN, file_mime)
 
@@ -178,6 +203,7 @@ class ManifestDataFrame(metaclass=Singleton):
                 mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name] = mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name].fillna(content)
             else:
                 mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name] = content
+                print(file_location, content)
 
             mDF.to_excel(os.path.join(row[MANIFEST_DIR_COLUMN], MANIFEST_FILENAME), sheet_name=row[SHEET_NAME_COLUMN], index=False, header=True)
 

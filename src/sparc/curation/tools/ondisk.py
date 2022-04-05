@@ -178,11 +178,20 @@ def search_for_view_files(dataset_dir, max_size):
 
     return metadata
 
+def search_for_plot_files(dataset_dir):
+    plot_file = []
+    result = list(Path(dataset_dir).rglob("sub*csv"))
+    print(result)
+    # For each result:
+    #   - Is this file actually a plot?
+    # Probably just leave this for now and go with the simple name comparison.
+    return result
 
 class OnDiskFiles(metaclass=Singleton):
     # dataFrame_dir = ""
     _onDiskFiles = None
     _scaffold = None
+    _plot_files = []
 
     class Scaffold(object):
         _scaffold_files = {
@@ -231,10 +240,15 @@ class OnDiskFiles(metaclass=Singleton):
     def get_scaffold_data(self):
         return self._scaffold
 
+    def get_plot_files(self):
+        return self._plot_files
+
     def setup_dataset(self, dataset_dir, max_size):
         self._scaffold = OnDiskFiles.Scaffold()
         metadata_file, metadata_views = search_for_metadata_files(dataset_dir, max_size)
         self._scaffold.set_metadate_files(metadata_file, metadata_views)
         self._scaffold.set_view_files(search_for_view_files(dataset_dir, max_size))
         self._scaffold.set_thumbnail_files(search_for_thumbnail_files(dataset_dir))
+        self._plot_files = search_for_plot_files(dataset_dir)
+        print(self._plot_files)
         return self
