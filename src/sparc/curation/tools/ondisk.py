@@ -2,6 +2,7 @@ import csv
 import json
 import os
 from pathlib import Path
+import pandas as pd
 
 from sparc.curation.tools.base import Singleton
 
@@ -56,6 +57,45 @@ def test_for_view(json_data):
     return is_view
 
 
+def get_plot(csv_file, is_tsv = False):
+    if is_tsv:
+        plot_df = pd.read_csv(csv_file, sep='\t')
+        print("tsv",plot_df)
+    else:
+        plot_df = pd.read_csv(csv_file)
+    plot_df.columns = plot_df.columns.str.lower()
+    plot = None
+    x_loc = 0
+    y_loc = []
+    if "time" in plot_df.columns:
+        if plot_df["time"].is_monotonic_increasing and plot_df["time"].is_unique:
+            x_loc = plot_df.columns.get_loc("time")
+            if x_loc != 0:
+                y_loc = list(range(x_loc + 1, len(plot_df.columns)))
+            plot = OnDiskFiles.Plot(csv_file, "timeseries", x = x_loc, y = y_loc)
+        else:
+            plot = OnDiskFiles.Plot(csv_file, "heatmap")
+    else:
+        if is_tsv:
+            plot_df = pd.read_csv(csv_file, header=None, sep='\t')
+        else:
+            plot_df = pd.read_csv(csv_file, header=None)
+        for column in plot_df.columns[:3]:
+            if plot_df[column].is_monotonic_increasing and plot_df[column].is_unique:
+                print("timeseries ",csv_file,plot_df.head())
+                if x_loc != 0:
+                    y_loc = list(range(x_loc + 1, len(df.columns)))
+                plot = OnDiskFiles.Plot(csv_file, "timeseries", x = x_loc, y = y_loc, no_header = True)
+                break
+            x_loc += 1
+        if not plot:
+            plot = OnDiskFiles.Plot(csv_file, "heatmap", no_header = True)
+    return plot
+
+#TODO check plot
+def test_for_plot(csv_file):
+    plot = OnDiskFiles.Plot(csv_file, "heatmap")
+
 def is_context_data_file(json_data):
     if json_data:
         if isinstance(json_data, dict):
@@ -107,9 +147,7 @@ def is_csv_of_type(r, max_size, test_func):
     result = False
     if os.path.getsize(r) < max_size and os.path.isfile(r):
         try:
-            with open(r, encoding='utf-8') as f:
-                csv_reader = csv.reader(f)
-                result = test_func(csv_reader)
+            result = test_func(r)
         except UnicodeDecodeError:
             return result
         except IsADirectoryError:
@@ -178,14 +216,22 @@ def search_for_view_files(dataset_dir, max_size):
 
     return metadata
 
-def search_for_plot_files(dataset_dir):
+def search_for_plot_files(dataset_dir, max_size):
     plot_file = []
-    result = list(Path(dataset_dir).rglob("sub*csv"))
-    print(result)
-    # For each result:
-    #   - Is this file actually a plot?
-    # Probably just leave this for now and go with the simple name comparison.
-    return result
+    csv_files = list(Path(os.path.join(dataset_dir, "primary")).rglob("*csv"))
+    for r in csv_files:
+        csv_plot = get_plot(r)
+        if csv_plot:
+            plot_file.append(csv_plot)
+    tsv_files = list(Path(os.path.join(dataset_dir, "primary")).rglob("*tsv"))
+    for r in tsv_files:
+        tsv_plot = get_plot(r, is_tsv = True)
+        if tsv_plot:
+            tsv_plot.delimiter = "tab"
+            plot_file.append(tsv_plot)
+    # txt_files = list(Path(dataset_dir).rglob("*txt"))
+    # print("search_for_plot_files", plot_file)
+    return plot_file
 
 class OnDiskFiles(metaclass=Singleton):
     # dataFrame_dir = ""
@@ -237,6 +283,42 @@ class OnDiskFiles(metaclass=Singleton):
         def get_thumbnail_files(self):
             return self._scaffold_files['thumbnail']
 
+    class Plot(object):
+        '''
+        Standard heatmap file:
+        Command: Python plot_annotation.py heatmap
+        Output: {"version": "1.0.0", "type": "plot", "attrs": {"style": "heatmap"}}
+
+        Standard timeseries file
+        Command: Python plot_annotation.py timeseries
+        Output: {"version": "1.0.0", "type": "plot", "attrs": {"style": "timeseries"}}
+
+        Standard timeserires tab delimited
+        Command: Python plot_annotation.py timeseries -d tab
+        Output: {"version": "1.0.0", "type": "plot", "attrs": {"style": "timeseries", "delimiter": "tab"}}
+
+        Timeseries variant - x-axis not in column zero, data columns in columns 2 and 3 only
+        Command: Python plot_annotation.py timeseries -x 1 -y 2 3
+        Output: {"version": "1.0.0", "type": "plot", "attrs": {"style": "timeseries", "x-axis": 1, "y-axes-columns": [2, 3]}}
+
+        Timeseries variant - no header
+        Command: Python plot_annotation.py timeseries -n
+        Output: {"version": "1.0.0", "type": "plot", "attrs": {"style": "timeseries", "no-header": true}}
+
+        Using range based y-axes specification
+        Command: Python plot_annotation.py timeseries -x 1 -y 3-5
+            
+        '''
+
+        def __init__(self, location, plot_type, no_header = None, delimiter = 'comma', x = 0, y = [], row_major = None):
+            self.location = location
+            self.plot_type = plot_type
+            self.x_axis_column = x
+            self.delimiter = delimiter
+            self.y_axes_columns = y
+            self.no_header = no_header
+            self.row_major = row_major
+
     def get_scaffold_data(self):
         return self._scaffold
 
@@ -249,6 +331,5 @@ class OnDiskFiles(metaclass=Singleton):
         self._scaffold.set_metadate_files(metadata_file, metadata_views)
         self._scaffold.set_view_files(search_for_view_files(dataset_dir, max_size))
         self._scaffold.set_thumbnail_files(search_for_thumbnail_files(dataset_dir))
-        self._plot_files = search_for_plot_files(dataset_dir)
-        print(self._plot_files)
+        self._plot_files = search_for_plot_files(dataset_dir, max_size)
         return self

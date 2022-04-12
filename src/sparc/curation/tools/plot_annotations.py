@@ -35,13 +35,40 @@ def flatten_nested_list(nested_list):
     return flat_list
 
 def annotate_plot(dataset_dir, data):
-    max_size = '2MiB'
+    max_size = '2000MiB'
     manifest_dir = os.path.join(dataset_dir, "primary")
     OnDiskFiles().setup_dataset(dataset_dir, convert_to_bytes(max_size))
     ManifestDataFrame().setup_dataframe(dataset_dir)
     plot_files = OnDiskFiles().get_plot_files()
     for plot_file in plot_files:
-        ManifestDataFrame().update_plot_annotation(manifest_dir, plot_file, data)
+        data = get_plot_annotation_data(plot_file)
+        ManifestDataFrame().update_plot_annotation(manifest_dir, plot_file.location, data)
+
+def get_plot_annotation_data(plot_file):
+    attrs = {
+        'style': plot_file.plot_type,
+    }
+    if plot_file.x_axis_column != 0:
+        attrs['x-axis'] = plot_file.x_axis_column
+
+    if plot_file.delimiter != 'comma':
+        attrs['delimiter'] = plot_file.delimiter
+
+    if len(plot_file.y_axes_columns):
+        attrs['y-axes-columns'] = flatten_nested_list(plot_file.y_axes_columns)
+
+    if plot_file.no_header:
+        attrs['no-header'] = plot_file.no_header
+
+    if plot_file.row_major:
+        attrs['row-major'] = plot_file.row_major
+
+    data = {
+        'version': VERSION,
+        'type': 'plot',
+        'attrs': attrs
+    }
+    return json.dumps(data)
 
 def main():
     parser = argparse.ArgumentParser(description='Create an annotation for a SPARC plot. '
@@ -66,30 +93,9 @@ def main():
 
     args = parser.parse_args()
     dataset_dir = args.dataset_dir
-    attrs = {
-        'style': args.plot_type,
-    }
-    if args.x_axis_column != 0:
-        attrs['x-axis'] = args.x_axis_column
-
-    if args.delimiter != 'comma':
-        attrs['delimiter'] = args.delimiter
-
-    if len(args.y_axes_columns):
-        attrs['y-axes-columns'] = flatten_nested_list(args.y_axes_columns)
-
-    if args.no_header:
-        attrs['no-header'] = args.no_header
-
-    if args.row_major:
-        attrs['row-major'] = args.row_major
-
-    data = {
-        'version': VERSION,
-        'type': 'plot',
-        'attrs': attrs
-    }
-    print(json.dumps(data))
+    
+    #TODO
+    data = get_plot_annotation_data(args)
     annotate_plot(dataset_dir, json.dumps(data))
 
 

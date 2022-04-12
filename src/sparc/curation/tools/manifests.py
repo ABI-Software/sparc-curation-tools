@@ -176,9 +176,10 @@ class ManifestDataFrame(metaclass=Singleton):
             # Re-read manifests to find dataframe for newly added entry.
             self._read_manifests()
             fileDF = self._get_matching_dataframe(file_location)
-
-        self.update_additional_type(file_location, PLOT_CSV_MIME)
-        
+        if file_location.suffix == ".csv":
+            self.update_additional_type(file_location, PLOT_CSV_MIME)
+        elif file_location.suffix == ".tsv":
+            self.update_additional_type(file_location, PLOT_TSV_MIME)
         self.update_supplemental_json(file_location, data)
 
     def update_additional_type(self, file_location, file_mime):
