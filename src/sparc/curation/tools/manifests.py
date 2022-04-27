@@ -129,36 +129,16 @@ class ManifestDataFrame(metaclass=Singleton):
     def get_source_of(self, file_location):
         return self.get_entry_that_includes(SOURCE_OF_COLUMN, file_location)
 
-    def get_file_dataframe(self, file_location):
+    def get_file_dataframe(self, file_location, manifest_dir = None):
         """
         Get file dataframe which match the file_location
         """
         manifestDataFrame = self._manifestDataFrame
-        file_dir = os.path.dirname(file_location)
-        file_name = os.path.basename(file_location)
-
-        # Search data rows to find match to the same file by file_location.
-        fileDF = self._get_matching_dataframe(file_location)
-
-        # If fileDF is empty, means there's no manifest file containing this file's annotation.
-        if fileDF.empty:
-            newRow = pd.DataFrame({FILENAME_COLUMN: file_name}, index=[1])
-            # Check if there's manifest file under same Scaffold File Dir. If yes get data from it.
-            # If no manifest file create new manifest file. Add file to the manifest.
-            if not manifestDataFrame[manifestDataFrame[MANIFEST_DIR_COLUMN] == file_dir].empty:
-                mDF = pd.read_excel(os.path.join(file_dir, MANIFEST_FILENAME))
-                newRow = pd.concat([mDF, newRow], ignore_index=True)
-            newRow.to_excel(os.path.join(file_dir, MANIFEST_FILENAME), index=False, header=True)
-
-            # Re-read manifests to find dataframe for newly added entry.
-            self._read_manifests()
-            fileDF = self._get_matching_dataframe(file_location)
-
-        return fileDF
-
-    def update_plot_annotation(self, manifest_dir, file_location, data):
-        manifestDataFrame = self._manifestDataFrame
-        file_name = os.path.relpath(file_location, manifest_dir)
+        if manifest_dir:
+            file_name = os.path.relpath(file_location, manifest_dir)
+        else:
+            manifest_dir = os.path.dirname(file_location)
+            file_name = os.path.basename(file_location)
 
         # Search data rows to find match to the same file by file_location.
         fileDF = self._get_matching_dataframe(file_location)
@@ -176,11 +156,25 @@ class ManifestDataFrame(metaclass=Singleton):
             # Re-read manifests to find dataframe for newly added entry.
             self._read_manifests()
             fileDF = self._get_matching_dataframe(file_location)
+
+        return fileDF
+
+    def update_plot_annotation(self, manifest_dir, file_location, supplemental_json_data, thumbnail_location):
+        fileDF = self.get_file_dataframe(file_location, manifest_dir)
+
         if file_location.suffix == ".csv":
             self.update_additional_type(file_location, PLOT_CSV_MIME)
         elif file_location.suffix == ".tsv":
             self.update_additional_type(file_location, PLOT_TSV_MIME)
-        self.update_supplemental_json(file_location, data)
+        self.update_supplemental_json(file_location, supplemental_json_data)
+
+        # Antotate Thumbnail file
+        if thumbnail_location:
+            self.get_file_dataframe(thumbnail_location, manifest_dir)
+            self.update_additional_type(thumbnail_location, SCAFFOLD_THUMBNAIL_MIME)
+            self.update_column_content(thumbnail_location, DERIVED_FROM_COLUMN, os.path.relpath(file_location, manifest_dir))
+            self.update_column_content(file_location, SOURCE_OF_COLUMN, os.path.relpath(thumbnail_location, manifest_dir))
+
 
     def update_additional_type(self, file_location, file_mime):
         self.update_column_content(file_location, ADDITIONAL_TYPES_COLUMN, file_mime)

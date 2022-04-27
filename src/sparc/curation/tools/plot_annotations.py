@@ -42,7 +42,7 @@ def annotate_plot(dataset_dir, data):
     plot_files = OnDiskFiles().get_plot_files()
     for plot_file in plot_files:
         data = get_plot_annotation_data(plot_file)
-        ManifestDataFrame().update_plot_annotation(manifest_dir, plot_file.location, data)
+        ManifestDataFrame().update_plot_annotation(manifest_dir, plot_file.location, data, plot_file.thumbnail)
 
 def get_plot_annotation_data(plot_file):
     attrs = {

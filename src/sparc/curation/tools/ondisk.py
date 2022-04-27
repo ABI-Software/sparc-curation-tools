@@ -98,7 +98,7 @@ def get_plot(csv_file, is_tsv = False):
         csv_path = os.path.splitext(csv_file)[0]
         fig_name = csv_path + '.jpeg'
         fig.write_image(fig_name)
-        plot.set_thumbnail(fig_name)
+        plot.set_thumbnail(os.path.join(os.path.dirname(csv_file),fig_name))
     return plot
 
 #TODO check plot
