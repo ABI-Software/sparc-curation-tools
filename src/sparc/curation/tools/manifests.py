@@ -204,7 +204,6 @@ class ManifestDataFrame(metaclass=Singleton):
                 mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name] = mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name].fillna(content)
             else:
                 mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name] = content
-                print(file_location, content)
 
             mDF.to_excel(os.path.join(row[MANIFEST_DIR_COLUMN], MANIFEST_FILENAME), sheet_name=row[SHEET_NAME_COLUMN], index=False, header=True)
 

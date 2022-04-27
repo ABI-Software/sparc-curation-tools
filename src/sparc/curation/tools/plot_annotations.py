@@ -77,8 +77,8 @@ def main():
                                                  'The -y/--y-axes-columns argument will consume the positional plot type argument. '
                                                  'That means the positional argument cannot follow the -y/--y-axes-columns.')
     parser.add_argument("dataset_dir", help='dataset dir')
-    parser.add_argument("plot_type", help='must define a plot type which is one of; ' + ', '.join(AVAILABLE_PLOT_TYPES) + '.',
-                        choices=AVAILABLE_PLOT_TYPES)
+    parser.add_argument("-plot_type","--plot_type", help='must define a plot type which is one of; ' + ', '.join(AVAILABLE_PLOT_TYPES) + '.',
+                        choices=AVAILABLE_PLOT_TYPES, default="timeseries")
     parser.add_argument("-x", "--x-axis-column", help="integer index for the independent column (zero based). Default is 0.",
                         type=int, default=0)
     parser.add_argument("-y", "--y-axes-columns", help="list of indices for the dependent columns (zero based). Can be used multiple times."
