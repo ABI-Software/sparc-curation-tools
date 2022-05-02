@@ -65,7 +65,6 @@ def get_plot(csv_file, is_tsv = False):
         plot_df = pd.read_csv(csv_file)
     plot_df.columns = plot_df.columns.str.lower()
     plot = None
-    fig = None
     x_loc = 0
     y_loc = []
     if "time" in plot_df.columns:
@@ -74,10 +73,8 @@ def get_plot(csv_file, is_tsv = False):
             if x_loc != 0:
                 y_loc = list(range(x_loc + 1, len(plot_df.columns)))
             plot = OnDiskFiles.Plot(csv_file, "timeseries", x = x_loc, y = y_loc)
-            fig = px.scatter(plot_df, x = "time", y=plot_df.columns[x_loc + 1:])
         else:
             plot = OnDiskFiles.Plot(csv_file, "heatmap")
-            fig = px.imshow(plot_df)
     else:
         if is_tsv:
             plot_df = pd.read_csv(csv_file, header=None, sep='\t')
@@ -88,17 +85,10 @@ def get_plot(csv_file, is_tsv = False):
                 if x_loc != 0:
                     y_loc = list(range(x_loc + 1, len(df.columns)))
                 plot = OnDiskFiles.Plot(csv_file, "timeseries", x = x_loc, y = y_loc, no_header = True)
-                fig = px.scatter(plot_df, x = plot_df.columns[x_loc], y=plot_df.columns[x_loc + 1:])
                 break
             x_loc += 1
         if not plot:
             plot = OnDiskFiles.Plot(csv_file, "heatmap", no_header = True)
-            fig = px.imshow(plot_df, x = plot_df.iloc[0], y = plot_df[0])
-    if fig:
-        csv_path = os.path.splitext(csv_file)[0]
-        fig_name = csv_path + '.jpeg'
-        fig.write_image(fig_name)
-        plot.set_thumbnail(os.path.join(os.path.dirname(csv_file),fig_name))
     return plot
 
 #TODO check plot
@@ -312,17 +302,45 @@ class OnDiskFiles(metaclass=Singleton):
     def get_plot_files(self):
         return self._plot_files
 
-    # def generate_plot_thumbnail(self):
-    #     for plot in self._plot_files:
-    #         if plot.plot_type == "timeseries":
-    #             pass
+    def get_plot_data(self):
+        return self._plot_files
+
+    def generate_plot_thumbnail(self):
+        for plot in self._plot_files:
+            if plot.location.suffix == ".tsv" and not plot.no_header:
+                plot_df = pd.read_csv(plot.location, sep='\t')
+                plot_df.columns = plot_df.columns.str.lower()
+            elif plot.location.suffix == ".csv" and not plot.no_header:
+                plot_df = pd.read_csv(plot.location)
+                plot_df.columns = plot_df.columns.str.lower()
+            elif plot.location.suffix == ".tsv" and plot.no_header:
+                plot_df = pd.read_csv(plot.location, header=None, sep='\t')
+            elif plot.location.suffix == ".csv" and plot.no_header:
+                plot_df = pd.read_csv(plot.location, header=None)
+
+            fig = None
+            if plot.plot_type == "timeseries" and not plot.no_header:
+                fig = px.scatter(plot_df, x = "time", y=plot_df.columns[plot.x_axis_column + 1:])
+            elif plot.plot_type == "heatmap" and not plot.no_header:
+                fig = px.imshow(plot_df)
+            elif plot.plot_type == "timeseries" and plot.no_header:
+                fig = px.scatter(plot_df, x = plot_df.columns[plot.x_axis_column], y=plot_df.columns[plot.x_axis_column + 1:])
+            elif plot.plot_type == "heatmap" and plot.no_header:
+                fig = px.imshow(plot_df, x = plot_df.iloc[0], y = plot_df[0])
+
+            if fig:
+                fig_path = os.path.splitext(plot.location)[0]
+                fig_name = fig_path + '.jpg'
+                fig.write_image(fig_name)
+                plot.set_thumbnail(os.path.join(os.path.dirname(plot.location),fig_name))
 
     def setup_dataset(self, dataset_dir, max_size):
         self._scaffold = OnDiskFiles.Scaffold()
-        metadata_file, metadata_views = search_for_metadata_files(dataset_dir, max_size)
+        scaffold_files_dir = os.path.join(dataset_dir, "derivative")
+        metadata_file, metadata_views = search_for_metadata_files(scaffold_files_dir, max_size)
         self._scaffold.set_metadate_files(metadata_file, metadata_views)
-        self._scaffold.set_view_files(search_for_view_files(dataset_dir, max_size))
-        self._scaffold.set_thumbnail_files(search_for_thumbnail_files(dataset_dir))
+        self._scaffold.set_view_files(search_for_view_files(scaffold_files_dir, max_size))
+        self._scaffold.set_thumbnail_files(search_for_thumbnail_files(scaffold_files_dir))
         self._plot_files = search_for_plot_files(dataset_dir, max_size)
         # self.generate_plot_thumbnail()
         return self

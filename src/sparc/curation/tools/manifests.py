@@ -87,6 +87,9 @@ class ManifestDataFrame(metaclass=Singleton):
     def get_scaffold_data(self):
         return self._scaffold_data
 
+    def get_plot_data(self):
+        return self._scaffold_data
+        
     def get_dataset_dir(self):
         return self._dataset_dir
 
@@ -122,6 +125,9 @@ class ManifestDataFrame(metaclass=Singleton):
 
     def scaffold_get_metadata_files(self):
         return self.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_META_MIME)
+
+    def scaffold_get_plot_files(self):
+        return self.get_matching_entry(ADDITIONAL_TYPES_COLUMN, PLOT_CSV_MIME) + self.get_matching_entry(ADDITIONAL_TYPES_COLUMN, PLOT_TSV_MIME)
 
     def get_derived_from(self, file_location):
         return self.get_matching_entry(DERIVED_FROM_COLUMN, file_location)
@@ -254,6 +260,9 @@ class ManifestDataFrame(metaclass=Singleton):
 
         def get_metadata_filenames(self):
             return self._parent.scaffold_get_metadata_files()
+
+        def get_plot_filenames(self):
+            return self._parent.scaffold_get_plot_files()
 
         def get_derived_from_filenames(self, source):
             return self._parent.get_derived_from(source)

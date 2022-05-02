@@ -39,6 +39,7 @@ def annotate_plot(dataset_dir, data):
     manifest_dir = os.path.join(dataset_dir, "primary")
     OnDiskFiles().setup_dataset(dataset_dir, convert_to_bytes(max_size))
     ManifestDataFrame().setup_dataframe(dataset_dir)
+    OnDiskFiles().generate_plot_thumbnail()
     plot_files = OnDiskFiles().get_plot_files()
     for plot_file in plot_files:
         data = get_plot_annotation_data(plot_file)
@@ -99,4 +100,5 @@ def main():
     annotate_plot(dataset_dir, json.dumps(data))
 
 
-main()
+if __name__ == "__main__":
+    main()
