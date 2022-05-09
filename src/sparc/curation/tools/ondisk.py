@@ -91,7 +91,7 @@ def get_plot(csv_file, is_tsv = False):
             plot = OnDiskFiles.Plot(csv_file, "heatmap", no_header = True)
     return plot
 
-#TODO check plot
+# TODO check plot
 def test_for_plot(csv_file):
     plot = OnDiskFiles.Plot(csv_file, "heatmap")
 
@@ -230,7 +230,42 @@ def search_for_plot_files(dataset_dir, max_size):
         if tsv_plot:
             tsv_plot.delimiter = "tab"
             plot_file.append(tsv_plot)
+    
+    txt_files = list(Path(os.path.join(dataset_dir, "primary")).rglob("*txt"))
+    for r in txt_files:
+        csv_location = create_csv_from_txt(r)
+        csv_plot = get_plot(csv_location)
+        if csv_plot:
+            plot_file.append(csv_plot)
+
     return plot_file
+
+def create_csv_from_txt(r):
+    data = open(r)
+    start = False
+    finish = False
+    csv_rows = []
+    for line in data:
+        if "+Fin" in line:
+            finish = True
+        elif start and not finish:
+            line_data_list = line.split()
+            if line_data_list[1].startswith("D"):
+                clean_data = line_data_list[1][1:].split(",")
+                line_data_list.pop()
+                if line_data_list[0].endswith("s"):
+                    line_data_list[0] = line_data_list[0][:-1]
+                line_data_list += clean_data
+                csv_rows.append(line_data_list)
+        else:
+            if "EIT STARTING" in line:
+                start = True
+    file_path = os.path.splitext(r)[0]
+    csv_file_name = file_path + '.csv'
+    with open(csv_file_name, 'w', newline='') as f:
+        write = csv.writer(f)
+        write.writerows(csv_rows)
+    return csv_file_name
 
 class OnDiskFiles(metaclass=Singleton):
     # dataFrame_dir = ""
@@ -303,7 +338,10 @@ class OnDiskFiles(metaclass=Singleton):
         return self._plot_files
 
     def get_plot_data(self):
-        return self._plot_files
+        file_names = []
+        for p in self._plot_files:
+            file_names.append(p.location)
+        return file_names
 
     def generate_plot_thumbnail(self):
         for plot in self._plot_files:
@@ -332,7 +370,7 @@ class OnDiskFiles(metaclass=Singleton):
                 fig_path = os.path.splitext(plot.location)[0]
                 fig_name = fig_path + '.jpg'
                 fig.write_image(fig_name)
-                plot.set_thumbnail(os.path.join(os.path.dirname(plot.location),fig_name))
+                plot.set_thumbnail(os.path.join(os.path.dirname(plot.location), fig_name))
 
     def setup_dataset(self, dataset_dir, max_size):
         self._scaffold = OnDiskFiles.Scaffold()
