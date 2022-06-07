@@ -101,6 +101,8 @@ With the activated virtual environment install the package.
 
 Then execute the application to print out the usage information to test the script.
 
+**Scaffold Annotations** 
+
 ::
 
   scaffold-annotations -h
@@ -114,9 +116,13 @@ Then execute the application to print out the usage information to test the scri
 Examples:
 ---------
 
+**Scaffold Annotations** 
+
 ::
 
   scaffold-annotations <dataset_dir>
+
+**Plot Annotations** 
 
 ::
 
