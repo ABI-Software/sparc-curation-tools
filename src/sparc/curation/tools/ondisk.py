@@ -2,6 +2,8 @@ import csv
 import json
 import os
 from pathlib import Path
+import pandas as pd
+import plotly.express as px
 
 from sparc.curation.tools.base import Singleton
 
@@ -55,6 +57,43 @@ def test_for_view(json_data):
 
     return is_view
 
+
+def get_plot(csv_file, is_tsv = False):
+    if is_tsv:
+        plot_df = pd.read_csv(csv_file, sep='\t')
+    else:
+        plot_df = pd.read_csv(csv_file)
+    plot_df.columns = plot_df.columns.str.lower()
+    plot = None
+    x_loc = 0
+    y_loc = []
+    if "time" in plot_df.columns:
+        if plot_df["time"].is_monotonic_increasing and plot_df["time"].is_unique:
+            x_loc = plot_df.columns.get_loc("time")
+            if x_loc != 0:
+                y_loc = list(range(x_loc + 1, len(plot_df.columns)))
+            plot = OnDiskFiles.Plot(csv_file, "timeseries", x = x_loc, y = y_loc)
+        else:
+            plot = OnDiskFiles.Plot(csv_file, "heatmap")
+    else:
+        if is_tsv:
+            plot_df = pd.read_csv(csv_file, header=None, sep='\t')
+        else:
+            plot_df = pd.read_csv(csv_file, header=None)
+        for column in plot_df.columns[:3]:
+            if plot_df[column].is_monotonic_increasing and plot_df[column].is_unique:
+                if x_loc != 0:
+                    y_loc = list(range(x_loc + 1, len(df.columns)))
+                plot = OnDiskFiles.Plot(csv_file, "timeseries", x = x_loc, y = y_loc, no_header = True)
+                break
+            x_loc += 1
+        if not plot:
+            plot = OnDiskFiles.Plot(csv_file, "heatmap", no_header = True)
+    return plot
+
+# TODO check plot
+def test_for_plot(csv_file):
+    plot = OnDiskFiles.Plot(csv_file, "heatmap")
 
 def is_context_data_file(json_data):
     if json_data:
@@ -178,11 +217,61 @@ def search_for_view_files(dataset_dir, max_size):
 
     return metadata
 
+def search_for_plot_files(dataset_dir, max_size):
+    plot_file = []
+    csv_files = list(Path(os.path.join(dataset_dir, "primary")).rglob("*csv"))
+    for r in csv_files:
+        csv_plot = get_plot(r)
+        if csv_plot:
+            plot_file.append(csv_plot)
+    tsv_files = list(Path(os.path.join(dataset_dir, "primary")).rglob("*tsv"))
+    for r in tsv_files:
+        tsv_plot = get_plot(r, is_tsv = True)
+        if tsv_plot:
+            tsv_plot.delimiter = "tab"
+            plot_file.append(tsv_plot)
+    
+    txt_files = list(Path(os.path.join(dataset_dir, "primary")).rglob("*txt"))
+    for r in txt_files:
+        csv_location = create_csv_from_txt(r)
+        csv_plot = get_plot(csv_location)
+        if csv_plot:
+            plot_file.append(csv_plot)
+
+    return plot_file
+
+def create_csv_from_txt(r):
+    data = open(r)
+    start = False
+    finish = False
+    csv_rows = []
+    for line in data:
+        if "+Fin" in line:
+            finish = True
+        elif start and not finish:
+            line_data_list = line.split()
+            if line_data_list[1].startswith("D"):
+                clean_data = line_data_list[1][1:].split(",")
+                line_data_list.pop()
+                if line_data_list[0].endswith("s"):
+                    line_data_list[0] = line_data_list[0][:-1]
+                line_data_list += clean_data
+                csv_rows.append(line_data_list)
+        else:
+            if "EIT STARTING" in line:
+                start = True
+    file_path = os.path.splitext(r)[0]
+    csv_file_name = file_path + '.csv'
+    with open(csv_file_name, 'w', newline='') as f:
+        write = csv.writer(f)
+        write.writerows(csv_rows)
+    return csv_file_name
 
 class OnDiskFiles(metaclass=Singleton):
     # dataFrame_dir = ""
     _onDiskFiles = None
     _scaffold = None
+    _plot_files = []
 
     class Scaffold(object):
         _scaffold_files = {
@@ -228,13 +317,68 @@ class OnDiskFiles(metaclass=Singleton):
         def get_thumbnail_files(self):
             return self._scaffold_files['thumbnail']
 
+    class Plot(object):
+        def __init__(self, location, plot_type, no_header = False, delimiter = 'comma', x = 0, y = [], row_major = False, thumbnail = None):
+            self.location = location
+            self.plot_type = plot_type
+            self.x_axis_column = x
+            self.delimiter = delimiter
+            self.y_axes_columns = y
+            self.no_header = no_header
+            self.row_major = row_major
+            self.thumbnail = thumbnail
+        
+        def set_thumbnail(self, thumbnail):
+            self.thumbnail = thumbnail
+
     def get_scaffold_data(self):
         return self._scaffold
 
+    def get_plot_files(self):
+        return self._plot_files
+
+    def get_plot_data(self):
+        file_names = []
+        for p in self._plot_files:
+            file_names.append(p.location)
+        return file_names
+
+    def generate_plot_thumbnail(self):
+        for plot in self._plot_files:
+            if plot.location.suffix == ".tsv" and not plot.no_header:
+                plot_df = pd.read_csv(plot.location, sep='\t')
+                plot_df.columns = plot_df.columns.str.lower()
+            elif plot.location.suffix == ".csv" and not plot.no_header:
+                plot_df = pd.read_csv(plot.location)
+                plot_df.columns = plot_df.columns.str.lower()
+            elif plot.location.suffix == ".tsv" and plot.no_header:
+                plot_df = pd.read_csv(plot.location, header=None, sep='\t')
+            elif plot.location.suffix == ".csv" and plot.no_header:
+                plot_df = pd.read_csv(plot.location, header=None)
+
+            fig = None
+            if plot.plot_type == "timeseries" and not plot.no_header:
+                fig = px.scatter(plot_df, x = "time", y=plot_df.columns[plot.x_axis_column + 1:])
+            elif plot.plot_type == "heatmap" and not plot.no_header:
+                fig = px.imshow(plot_df)
+            elif plot.plot_type == "timeseries" and plot.no_header:
+                fig = px.scatter(plot_df, x = plot_df.columns[plot.x_axis_column], y=plot_df.columns[plot.x_axis_column + 1:])
+            elif plot.plot_type == "heatmap" and plot.no_header:
+                fig = px.imshow(plot_df, x = plot_df.iloc[0], y = plot_df[0])
+
+            if fig:
+                fig_path = os.path.splitext(plot.location)[0]
+                fig_name = fig_path + '.jpg'
+                fig.write_image(fig_name)
+                plot.set_thumbnail(os.path.join(os.path.dirname(plot.location), fig_name))
+
     def setup_dataset(self, dataset_dir, max_size):
         self._scaffold = OnDiskFiles.Scaffold()
-        metadata_file, metadata_views = search_for_metadata_files(dataset_dir, max_size)
+        scaffold_files_dir = os.path.join(dataset_dir, "derivative")
+        metadata_file, metadata_views = search_for_metadata_files(scaffold_files_dir, max_size)
         self._scaffold.set_metadate_files(metadata_file, metadata_views)
-        self._scaffold.set_view_files(search_for_view_files(dataset_dir, max_size))
-        self._scaffold.set_thumbnail_files(search_for_thumbnail_files(dataset_dir))
+        self._scaffold.set_view_files(search_for_view_files(scaffold_files_dir, max_size))
+        self._scaffold.set_thumbnail_files(search_for_thumbnail_files(scaffold_files_dir))
+        self._plot_files = search_for_plot_files(dataset_dir, max_size)
+        # self.generate_plot_thumbnail()
         return self

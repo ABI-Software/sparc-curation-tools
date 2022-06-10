@@ -5,6 +5,8 @@ SCAFFOLD_META_MIME = 'application/x.vnd.abi.scaffold.meta+json'
 SCAFFOLD_VIEW_MIME = 'application/x.vnd.abi.scaffold.view+json'
 SCAFFOLD_THUMBNAIL_MIME = 'image/x.vnd.abi.thumbnail+jpeg'
 CONTEXT_INFO_MIME = 'application/x.vnd.abi.context-information+json'
+PLOT_CSV_MIME = 'text/x.vnd.abi.plot+csv'
+PLOT_TSV_MIME = 'text/vnd.abi.plot+Tab-separated-values'
 
 SIZE_NAME = ("B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB")
 

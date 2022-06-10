@@ -1,6 +1,11 @@
+import os
 import re
 import argparse
 import json
+
+from sparc.curation.tools.manifests import ManifestDataFrame
+from sparc.curation.tools.ondisk import OnDiskFiles
+from sparc.curation.tools.utilities import convert_to_bytes
 
 VERSION = '1.2.0'
 AVAILABLE_PLOT_TYPES = ['heatmap', 'timeseries']
@@ -29,6 +34,42 @@ def flatten_nested_list(nested_list):
             flat_list.append(elem)
     return flat_list
 
+def annotate_plot(dataset_dir, data):
+    max_size = '2000MiB'
+    manifest_dir = os.path.join(dataset_dir, "primary")
+    OnDiskFiles().setup_dataset(dataset_dir, convert_to_bytes(max_size))
+    ManifestDataFrame().setup_dataframe(dataset_dir)
+    OnDiskFiles().generate_plot_thumbnail()
+    plot_files = OnDiskFiles().get_plot_files()
+    for plot_file in plot_files:
+        data = get_plot_annotation_data(plot_file)
+        ManifestDataFrame().update_plot_annotation(manifest_dir, plot_file.location, data, plot_file.thumbnail)
+
+def get_plot_annotation_data(plot_file):
+    attrs = {
+        'style': plot_file.plot_type,
+    }
+    if plot_file.x_axis_column != 0:
+        attrs['x-axis'] = plot_file.x_axis_column
+
+    if plot_file.delimiter != 'comma':
+        attrs['delimiter'] = plot_file.delimiter
+
+    if len(plot_file.y_axes_columns):
+        attrs['y-axes-columns'] = flatten_nested_list(plot_file.y_axes_columns)
+
+    if plot_file.no_header:
+        attrs['no-header'] = plot_file.no_header
+
+    if plot_file.row_major:
+        attrs['row-major'] = plot_file.row_major
+
+    data = {
+        'version': VERSION,
+        'type': 'plot',
+        'attrs': attrs
+    }
+    return json.dumps(data)
 
 def main():
     parser = argparse.ArgumentParser(description='Create an annotation for a SPARC plot. '
@@ -36,8 +77,9 @@ def main():
                                                  'The start and end numbers are included in the range. '
                                                  'The -y/--y-axes-columns argument will consume the positional plot type argument. '
                                                  'That means the positional argument cannot follow the -y/--y-axes-columns.')
-    parser.add_argument("plot_type", help='must define a plot type which is one of; ' + ', '.join(AVAILABLE_PLOT_TYPES) + '.',
-                        choices=AVAILABLE_PLOT_TYPES)
+    parser.add_argument("dataset_dir", help='dataset dir')
+    parser.add_argument("-plot_type","--plot_type", help='must define a plot type which is one of; ' + ', '.join(AVAILABLE_PLOT_TYPES) + '.',
+                        choices=AVAILABLE_PLOT_TYPES, default="timeseries")
     parser.add_argument("-x", "--x-axis-column", help="integer index for the independent column (zero based). Default is 0.",
                         type=int, default=0)
     parser.add_argument("-y", "--y-axes-columns", help="list of indices for the dependent columns (zero based). Can be used multiple times."
@@ -51,30 +93,12 @@ def main():
                         default='comma', choices=AVAILABLE_DELIMITERS)
 
     args = parser.parse_args()
-    attrs = {
-        'style': args.plot_type,
-    }
-    if args.x_axis_column != 0:
-        attrs['x-axis'] = args.x_axis_column
-
-    if args.delimiter != 'comma':
-        attrs['delimiter'] = args.delimiter
-
-    if len(args.y_axes_columns):
-        attrs['y-axes-columns'] = flatten_nested_list(args.y_axes_columns)
-
-    if args.no_header:
-        attrs['no-header'] = args.no_header
-
-    if args.row_major:
-        attrs['row-major'] = args.row_major
-
-    data = {
-        'version': VERSION,
-        'type': 'plot',
-        'attrs': attrs
-    }
-    print(json.dumps(data))
+    dataset_dir = args.dataset_dir
+    
+    #TODO
+    data = get_plot_annotation_data(args)
+    annotate_plot(dataset_dir, json.dumps(data))
 
 
-main()
+if __name__ == "__main__":
+    main()
