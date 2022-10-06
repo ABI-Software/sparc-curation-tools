@@ -11,14 +11,14 @@ def get_dataset_dir():
     return ManifestDataFrame().get_dataset_dir()
 
 
-def get_context_info_file():
+def get_context_info_file(filename = "scaffold_context_info.json"):
     dataset_dir = ManifestDataFrame().get_dataset_dir()
     context_info_dir = dataset_dir
     if os.path.exists(os.path.join(dataset_dir, "files")):
         dataset_dir = os.path.join(dataset_dir, "files")
     if os.path.exists(os.path.join(dataset_dir, "derivative")):
         context_info_dir = os.path.join(dataset_dir, "derivative")
-    return os.path.join(context_info_dir, "scaffold_context_info.json")
+    return os.path.join(context_info_dir, filename)
 
 
 def get_context_info_dir():
