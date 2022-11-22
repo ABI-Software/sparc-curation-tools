@@ -6,8 +6,7 @@ from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN, MANIFEST_DIR_
 
 class ContextInfoAnnotation(object):
     """
-    TODO use this class to wrap one dataframe row to an object.
-    Only rows with ADDITIONAL_TYPES_COLUMN will be wrapped by this class
+    TODO
     """
 
     def __init__(self, metadata_file, filename):
@@ -36,29 +35,6 @@ class ContextInfoAnnotation(object):
             "views": self._views,
         }
         return data
-
-    def get_annotation_data_json(self):
-        annotation_data = {
-            "version": "0.2.0",
-            "id": "sparc.science.annotation_data",
-        }
-
-        def _add_entry(_annotation_data, annotation, value):
-            if annotation and annotation != "--":
-                if annotation in _annotation_data:
-                    _annotation_data[annotation].append(value)
-                else:
-                    _annotation_data[annotation] = [value]
-
-        for v in self._views:
-            _add_entry(annotation_data, v["annotation"], v["id"])
-            if v["annotation"] != "--":
-                context_annotations.update_anatomical_entity(os.path.join(self._location, v["path"]), v["annotation"])
-
-        for s in self._samples:
-            _add_entry(annotation_data, s["annotation"], s["id"])
-        
-        return annotation_data
 
     def __eq__(self, other):
         return os.path.samefile(self.get_location(), other.get_location())

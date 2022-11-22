@@ -2,7 +2,8 @@ import json
 import os
 from pathlib import Path
 
-from sparc.curation.tools.definitions import CONTEXT_INFO_MIME
+from sparc.curation.tools.utilities import get_absolute_path
+from sparc.curation.tools.definitions import CONTEXT_INFO_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN
 from sparc.curation.tools.manifests import ManifestDataFrame
 from sparc.curation.tools.ondisk import is_json_of_type, is_csv_of_type, is_context_data_file, is_annotation_csv_file
 
@@ -11,18 +12,42 @@ def get_dataset_dir():
     return ManifestDataFrame().get_dataset_dir()
 
 
-def get_context_info_file(filename = "scaffold_context_info.json"):
-    dataset_dir = ManifestDataFrame().get_dataset_dir()
-    context_info_dir = dataset_dir
-    if os.path.exists(os.path.join(dataset_dir, "files")):
-        dataset_dir = os.path.join(dataset_dir, "files")
-    if os.path.exists(os.path.join(dataset_dir, "derivative")):
-        context_info_dir = os.path.join(dataset_dir, "derivative")
-    return os.path.join(context_info_dir, filename)
+def update_context_info(context_info):
+    context_info_location = get_absolute_path(get_dataset_dir(), context_info._fileName)
+    metadata_location = get_absolute_path(get_dataset_dir(), context_info._metadata_file)
+    data = context_info.get_context_json()
+    annotation_data = create_annotation_data_json(data)
+    write_context_info(context_info_location, data)
+    update_additional_type(context_info_location)
+    update_supplemental_json(context_info_location, json.dumps(annotation_data))
+    update_derived_from_entity(context_info_location, os.path.basename(context_info._metadata_file))
+    update_parent_source_of_entity(os.path.basename(context_info_location), metadata_location)
 
 
-def get_context_info_dir():
-    return os.path.dirname(get_context_info_file())
+def create_annotation_data_json(data):
+    views = data["views"]
+    samples = data["samples"]
+    annotation_data = {
+        "version": "0.2.0",
+        "id": "sparc.science.annotation_data",
+    }
+
+    def _add_entry(_annotation_data, annotation, value):
+        if annotation and annotation != "--":
+            if annotation in _annotation_data:
+                _annotation_data[annotation].append(value)
+            else:
+                _annotation_data[annotation] = [value]
+
+    for v in views:
+        _add_entry(annotation_data, v["annotation"], v["id"])
+        if v["annotation"] != "--":
+            update_anatomical_entity(get_absolute_path(get_dataset_dir(), v["path"]), v["annotation"])
+
+    for s in samples:
+        _add_entry(annotation_data, s["annotation"], s["id"])
+
+    return annotation_data
 
 
 def write_context_info(context_info_location, data):
@@ -40,6 +65,14 @@ def update_supplemental_json(file_location, annotation_data):
 
 def update_anatomical_entity(file_location, annotation_data):
     ManifestDataFrame().update_anatomical_entity(file_location, annotation_data)
+
+
+def update_parent_source_of_entity(file_location, parent_location):
+    ManifestDataFrame().update_column_content(parent_location, SOURCE_OF_COLUMN, file_location, True)
+
+
+def update_derived_from_entity(file_location, parent_location):
+    ManifestDataFrame().update_column_content(file_location, DERIVED_FROM_COLUMN, parent_location)
 
 
 def search_for_context_data_files(dataset_dir, max_size):
