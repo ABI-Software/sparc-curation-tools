@@ -48,8 +48,3 @@ def get_absolute_path(dataset_dir, filename):
     if os.path.exists(os.path.join(dataset_dir, "derivative")):
         dataset_dir = os.path.join(dataset_dir, "derivative")
     return os.path.join(dataset_dir, filename)
-
-
-def get_relative_path(dataset_dir, filename):
-    # TODO From the dataset dir or "Files" folder?
-    return os.path.relpath(filename, dataset_dir)
