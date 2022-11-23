@@ -20,8 +20,8 @@ class ContextInfoAnnotation(object):
         self._context_heading = data["heading"] if "heading" in data else ""
         self._banner = data["banner"] if "banner" in data else ""
         self._context_description = data["description"] if "description" in data else ""
-        self._samples = data["samples"] if "samples" in data else ""
-        self._views = data["views"] if "views" in data else ""
+        self._samples = data["samples"] if "samples" in data else []
+        self._views = data["views"] if "views" in data else []
 
     def get_context_json(self):
         data = {
