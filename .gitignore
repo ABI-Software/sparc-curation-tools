@@ -130,3 +130,5 @@ dmypy.json
 
 # PyCharm project files
 .idea/
+
+tests/resources
