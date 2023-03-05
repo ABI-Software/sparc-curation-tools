@@ -3,7 +3,11 @@ import json
 import os
 from pathlib import Path
 import pandas as pd
-import plotly.express as px
+try:
+    import plotly.express as px
+    no_plotly = False
+except ImportError:
+    no_plotly = True
 
 from sparc.curation.tools.base import Singleton
 
@@ -357,14 +361,18 @@ class OnDiskFiles(metaclass=Singleton):
                 plot_df = pd.read_csv(plot.location, header=None)
 
             fig = None
-            if plot.plot_type == "timeseries" and not plot.no_header:
-                fig = px.scatter(plot_df, x = "time", y=plot_df.columns[plot.x_axis_column + 1:])
-            elif plot.plot_type == "heatmap" and not plot.no_header:
-                fig = px.imshow(plot_df)
-            elif plot.plot_type == "timeseries" and plot.no_header:
-                fig = px.scatter(plot_df, x = plot_df.columns[plot.x_axis_column], y=plot_df.columns[plot.x_axis_column + 1:])
-            elif plot.plot_type == "heatmap" and plot.no_header:
-                fig = px.imshow(plot_df, x = plot_df.iloc[0], y = plot_df[0])
+
+            if no_plotly:
+                print("Plotly is not available, install for figure plotting functionality.")
+            else:
+                if plot.plot_type == "timeseries" and not plot.no_header:
+                    fig = px.scatter(plot_df, x = "time", y=plot_df.columns[plot.x_axis_column + 1:])
+                elif plot.plot_type == "heatmap" and not plot.no_header:
+                    fig = px.imshow(plot_df)
+                elif plot.plot_type == "timeseries" and plot.no_header:
+                    fig = px.scatter(plot_df, x = plot_df.columns[plot.x_axis_column], y=plot_df.columns[plot.x_axis_column + 1:])
+                elif plot.plot_type == "heatmap" and plot.no_header:
+                    fig = px.imshow(plot_df, x = plot_df.iloc[0], y = plot_df[0])
 
             if fig:
                 fig_path = os.path.splitext(plot.location)[0]
