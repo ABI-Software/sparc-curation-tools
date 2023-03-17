@@ -4,11 +4,12 @@ import os
 from pathlib import Path
 import pandas as pd
 
-from sparc.curation.tools.plot_utilities import create_thumbnail_from_plot
 
 try:
-    import plotly.express as px
+    from sparc.curation.tools.plot_utilities import create_thumbnail_from_plot
+    px = True
 except ImportError:
+    create_thumbnail_from_plot = None
     px = None
 
 
