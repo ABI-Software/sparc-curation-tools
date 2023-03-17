@@ -1,5 +1,4 @@
 import os
-import re
 from pathlib import Path
 
 import pandas as pd
@@ -223,10 +222,19 @@ class ManifestDataFrame(metaclass=Singleton):
                         target_filenames.extend(self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN))
 
             elif mime == SCAFFOLD_THUMBNAIL_MIME:
+                source_filenames = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, file_location, FILENAME_COLUMN)
+                source_filename = source_filenames[0]
+                best_match = -1
                 for t in target:
                     target_manifest = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, MANIFEST_DIR_COLUMN)
                     if source_manifest == target_manifest:
-                        target_filenames = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN)
+                        matching_entries = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN)
+                        match_rating = [calculate_match(tt, source_filename) for tt in matching_entries]
+                        max_value = max(match_rating)
+                        max_index = match_rating.index(max_value)
+                        if max_value > best_match:
+                            best_match = max_value
+                            target_filenames = [matching_entries[max_index]]
 
             self._parent.update_column_content(file_location, DERIVED_FROM_COLUMN, "\n".join(target_filenames))
 
@@ -240,10 +248,19 @@ class ManifestDataFrame(metaclass=Singleton):
                         target_filenames.extend(self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN))
 
             elif mime == SCAFFOLD_VIEW_MIME:
+                source_filenames = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, file_location, FILENAME_COLUMN)
+                source_filename = source_filenames[0]
+                best_match = -1
                 for t in target:
                     target_manifest = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, MANIFEST_DIR_COLUMN)
                     if source_manifest == target_manifest:
-                        target_filenames = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN)
+                        matching_entries = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN)
+                        match_rating = [calculate_match(tt, source_filename) for tt in matching_entries]
+                        max_value = max(match_rating)
+                        max_index = match_rating.index(max_value)
+                        if max_value > best_match:
+                            best_match = max_value
+                            target_filenames = [matching_entries[max_index]]
 
             self._parent.update_column_content(file_location, SOURCE_OF_COLUMN, "\n".join(target_filenames))
 
@@ -330,8 +347,13 @@ class ManifestDataFrame(metaclass=Singleton):
                     manifest_derived_from_files.extend(derived_from_files)
 
                 if len(manifest_derived_from_files) == 0:
+                    print('here')
+                    print(i)
+                    print(on_disk_parent_files)
                     errors.append(IncorrectDerivedFromError(i, incorrect_mime, on_disk_parent_files))
                 elif len(manifest_derived_from_files) == 1:
+                    print("derived from files == 1")
+                    print(i, on_disk_parent_files)
                     if i in on_disk_files and manifest_derived_from_files[0] not in on_disk_parent_files:
                         errors.append(IncorrectDerivedFromError(i, incorrect_mime, on_disk_parent_files))
 
@@ -393,3 +415,15 @@ class ManifestDataFrame(metaclass=Singleton):
             errors.extend(view_source_of_errors)
 
             return errors
+
+
+def calculate_match(item1, item2):
+    common_prefix = ''
+
+    for x, y in zip(item1, item2):
+        if x == y:
+            common_prefix += x
+        else:
+            break
+
+    return len(common_prefix)
