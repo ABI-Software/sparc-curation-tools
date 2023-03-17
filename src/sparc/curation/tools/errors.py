@@ -17,8 +17,17 @@ class ScaffoldAnnotationError(object):
     def get_mime(self):
         return self._mime
 
+    def __eq__(self, other):
+        return self._mime == other.get_mime() and self._location == other.get_location() and self.get_error_message() == other.get_error_message()
+
     # def __str__(self):
     #     return f'Error: {self._message}'
+
+
+class OldAnnotationError(ScaffoldAnnotationError):
+    def __init__(self, location, mime):
+        message = f"Found old annotation '{mime}'"
+        super(OldAnnotationError, self).__init__(message, location, mime)
 
 
 class NotAnnotatedError(ScaffoldAnnotationError):
@@ -36,6 +45,12 @@ class IncorrectBaseError(ScaffoldAnnotationError):
 
     def get_target(self):
         return self._target
+
+    def __eq__(self, other):
+        if super(IncorrectBaseError, self).__eq__(other):
+            return self._target == other.get_target()
+
+        return False
 
 
 class IncorrectSourceOfError(IncorrectBaseError):

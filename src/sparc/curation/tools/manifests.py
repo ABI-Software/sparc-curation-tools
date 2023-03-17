@@ -5,11 +5,12 @@ from pathlib import Path
 import pandas as pd
 
 from sparc.curation.tools.errors import IncorrectAnnotationError, NotAnnotatedError, IncorrectDerivedFromError, \
-    IncorrectSourceOfError, BadManifestError
+    IncorrectSourceOfError, BadManifestError, OldAnnotationError
 from sparc.curation.tools.base import Singleton
 from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN, FILENAME_COLUMN, SUPPLEMENTAL_JSON_COLUMN, \
     ADDITIONAL_TYPES_COLUMN, ANATOMICAL_ENTITY_COLUMN, SCAFFOLD_META_MIME, SCAFFOLD_VIEW_MIME, \
-    SCAFFOLD_THUMBNAIL_MIME, SCAFFOLD_DIR_MIME, PLOT_CSV_MIME, PLOT_TSV_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN, MANIFEST_DIR_COLUMN, MANIFEST_FILENAME, SHEET_NAME_COLUMN
+    SCAFFOLD_THUMBNAIL_MIME, SCAFFOLD_DIR_MIME, PLOT_CSV_MIME, PLOT_TSV_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN, MANIFEST_DIR_COLUMN, MANIFEST_FILENAME, SHEET_NAME_COLUMN, \
+    OLD_SCAFFOLD_MIMES
 from sparc.curation.tools.utilities import is_same_file
 
 
@@ -27,8 +28,7 @@ class ManifestDataFrame(metaclass=Singleton):
 
     def _read_manifests(self, depth=0):
         self._manifestDataFrame = pd.DataFrame()
-        result = list(Path(self._dataset_dir).rglob(MANIFEST_FILENAME))
-        for r in result:
+        for r in Path(self._dataset_dir).rglob(MANIFEST_FILENAME):
             xl_file = pd.ExcelFile(r)
             for sheet_name in xl_file.sheet_names:
                 currentDataFrame = xl_file.parse(sheet_name)
@@ -181,7 +181,6 @@ class ManifestDataFrame(metaclass=Singleton):
             self.update_column_content(thumbnail_location, DERIVED_FROM_COLUMN, os.path.relpath(file_location, manifest_dir))
             self.update_column_content(file_location, SOURCE_OF_COLUMN, os.path.relpath(thumbnail_location, manifest_dir))
 
-
     def update_additional_type(self, file_location, file_mime):
         self.update_column_content(file_location, ADDITIONAL_TYPES_COLUMN, file_mime)
 
@@ -207,6 +206,8 @@ class ManifestDataFrame(metaclass=Singleton):
 
             mDF.to_excel(os.path.join(row[MANIFEST_DIR_COLUMN], MANIFEST_FILENAME), sheet_name=row[SHEET_NAME_COLUMN], index=False, header=True)
 
+        self._read_manifests()
+
     class Scaffold(object):
 
         def __init__(self, parent):
@@ -222,16 +223,10 @@ class ManifestDataFrame(metaclass=Singleton):
                         target_filenames.extend(self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN))
 
             elif mime == SCAFFOLD_THUMBNAIL_MIME:
-                target_filenames = []
                 for t in target:
                     target_manifest = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, MANIFEST_DIR_COLUMN)
                     if source_manifest == target_manifest:
-                        file_location_stub = re.sub(r"_thumbnail.jpeg$", "", file_location)
-                        if t.startswith(file_location_stub):
-                            target_filenames = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN)
-
-            if len(target_filenames) == 0:
-                target_filenames = []
+                        target_filenames = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN)
 
             self._parent.update_column_content(file_location, DERIVED_FROM_COLUMN, "\n".join(target_filenames))
 
@@ -245,16 +240,10 @@ class ManifestDataFrame(metaclass=Singleton):
                         target_filenames.extend(self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN))
 
             elif mime == SCAFFOLD_VIEW_MIME:
-                target_filenames = []
                 for t in target:
                     target_manifest = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, MANIFEST_DIR_COLUMN)
                     if source_manifest == target_manifest:
-                        file_location_stub = re.sub(r"_view.json$", "", file_location)
-                        if t.startswith(file_location_stub):
-                            target_filenames = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN)
-
-            if len(target_filenames) == 0:
-                target_filenames = []
+                        target_filenames = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN)
 
             self._parent.update_column_content(file_location, SOURCE_OF_COLUMN, "\n".join(target_filenames))
 
@@ -269,6 +258,17 @@ class ManifestDataFrame(metaclass=Singleton):
 
         def get_source_of_filenames(self, source):
             return self._parent.get_source_of(source)
+
+        def get_old_annotations(self):
+            errors = []
+            OLD_ANNOTATIONS = OLD_SCAFFOLD_MIMES
+
+            for old_annotation in OLD_ANNOTATIONS:
+                manifest_metadata_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, old_annotation, FILE_LOCATION_COLUMN)
+                for i in manifest_metadata_files:
+                    errors.append(OldAnnotationError(i, old_annotation))
+
+            return errors
 
         def get_missing_annotations(self, on_disk):
             errors = []
@@ -304,7 +304,6 @@ class ManifestDataFrame(metaclass=Singleton):
             manifest_metadata_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_META_MIME, FILE_LOCATION_COLUMN)
             manifest_view_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_VIEW_MIME, FILE_LOCATION_COLUMN)
             manifest_thumbnail_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_THUMBNAIL_MIME, FILE_LOCATION_COLUMN)
-            manifest_directory_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_DIR_MIME, FILE_LOCATION_COLUMN)
 
             for i in manifest_metadata_files:
                 if i not in on_disk_metadata_files:
@@ -317,9 +316,6 @@ class ManifestDataFrame(metaclass=Singleton):
             for i in manifest_thumbnail_files:
                 if i not in on_disk_thumbnail_files:
                     errors.append(IncorrectAnnotationError(i, SCAFFOLD_THUMBNAIL_MIME))
-
-            for i in manifest_directory_files:
-                errors.append(IncorrectAnnotationError(i, SCAFFOLD_DIR_MIME))
 
             return errors
 
@@ -365,6 +361,7 @@ class ManifestDataFrame(metaclass=Singleton):
             for i in manifest_files:
                 if i in on_disk_files:
                     manifest_source_of = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, i, SOURCE_OF_COLUMN)
+
                     if pd.isna(manifest_source_of) or len(manifest_source_of) == 0:
                         errors.append(IncorrectSourceOfError(i, incorrect_mime, on_disk_child_files))
                     else:

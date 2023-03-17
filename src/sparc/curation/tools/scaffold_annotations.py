@@ -2,11 +2,17 @@ import argparse
 import os
 
 from sparc.curation.tools.definitions import MANIFEST_DIR_COLUMN
-from sparc.curation.tools.errors import NotAnnotatedError, IncorrectAnnotationError, IncorrectDerivedFromError, IncorrectSourceOfError
+from sparc.curation.tools.errors import NotAnnotatedError, IncorrectAnnotationError, IncorrectDerivedFromError, IncorrectSourceOfError, OldAnnotationError
 from sparc.curation.tools.errors import AnnotationDirectoryNoWriteAccess
 from sparc.curation.tools.manifests import ManifestDataFrame
 from sparc.curation.tools.ondisk import OnDiskFiles
 from sparc.curation.tools.utilities import convert_to_bytes
+
+
+def check_for_old_annotations():
+    errors = []
+    errors += ManifestDataFrame().get_scaffold_data().get_old_annotations()
+    return errors
 
 
 def check_additional_types_annotations():
@@ -30,6 +36,7 @@ def check_source_of_annotations():
 
 def get_errors():
     errors = []
+    errors.extend(check_for_old_annotations())
     errors.extend(check_additional_types_annotations())
     errors.extend(check_derived_from_annotations())
     errors.extend(check_source_of_annotations())
@@ -64,8 +71,8 @@ def fix_error(error):
                 if not os.access(manifest_dir, os.W_OK):
                     raise AnnotationDirectoryNoWriteAccess(f"Cannot write to directory {manifest_dir}.")
 
-    # Check incorrect annotation before no annotation.
-    if isinstance(error, IncorrectAnnotationError):
+    # Correct old annotation first, then incorrect annotation, and lastly no annotation.
+    if isinstance(error, OldAnnotationError) or isinstance(error, IncorrectAnnotationError):
         ManifestDataFrame().update_additional_type(error.get_location(), None)
     elif isinstance(error, NotAnnotatedError):
         ManifestDataFrame().update_additional_type(error.get_location(), error.get_mime())
@@ -73,6 +80,20 @@ def fix_error(error):
         ManifestDataFrame().get_scaffold_data().update_derived_from(error.get_location(), error.get_mime(), error.get_target())
     elif isinstance(error, IncorrectSourceOfError):
         ManifestDataFrame().get_scaffold_data().update_source_of(error.get_location(), error.get_mime(), error.get_target())
+
+
+def fix_errors(errors):
+    failed = False
+    while not failed and len(errors) > 0:
+        current_error = errors[0]
+
+        fix_error(current_error)
+
+        errors = get_errors()
+
+        error_comparison = [error == current_error for error in errors]
+        if any(error_comparison):
+            failed = True
 
 
 def main():
@@ -116,8 +137,7 @@ def main():
     # Step 5:
     #   - Fix errors as identified by user.
     if args.fix:
-        for error in errors:
-            fix_error(error)
+        fix_errors(errors)
 
 
 if __name__ == "__main__":

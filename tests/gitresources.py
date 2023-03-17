@@ -42,6 +42,13 @@ def dulwich_checkout(repo, target):
     checkout_branch(repo, target)
 
 
+def dulwich_proper_stash_and_drop(repo):
+    dulwich.porcelain.stash_push(repo)
+    for e in dulwich.porcelain.stash_list(repo):
+        dulwich.porcelain.reset(repo, "hard", e[1].old_sha)
+    dulwich.porcelain.stash_drop(repo, 0)
+
+
 class AbortCheckout(Exception):
     """Indicates that the working directory is not clean while trying to checkout."""
 
@@ -146,19 +153,6 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False):
             blob = repo.object_store[entry.sha]
             ensure_dir_exists(os.path.dirname(full_path))
             st = porcelain.build_file_from_blob(blob, entry.mode, full_path)
-            st_tuple = (
-                entry.mode,
-                st.st_ino,
-                st.st_dev,
-                st.st_nlink,
-                st.st_uid,
-                st.st_gid,
-                st.st_size,
-                st.st_atime,
-                st.st_mtime,
-                st.st_ctime,
-            )
-            st = st.__class__(st_tuple)
             repo_index[entry.path] = dulwich.index.index_entry_from_stat(st, entry.sha, 0)
 
         repo_index.write()
