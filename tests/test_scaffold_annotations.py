@@ -1,8 +1,6 @@
 import os.path
 import unittest
 
-import dulwich.porcelain
-import dulwich.repo
 from sparc.curation.tools.manifests import ManifestDataFrame
 from sparc.curation.tools.ondisk import OnDiskFiles
 from sparc.curation.tools.scaffold_annotations import get_errors, fix_errors
@@ -61,6 +59,36 @@ class ScaffoldAnnotationTestCase(unittest.TestCase):
         ManifestDataFrame().setup_dataframe(dataset_dir)
         errors = get_errors()
         self.assertEqual(4, len(errors))
+
+        fix_errors(errors)
+
+        remaining_errors = get_errors()
+
+        self.assertEqual(0, len(remaining_errors))
+
+    def test_annotate_bare_scaffold_new_layout(self):
+        dulwich_checkout(self._repo, b"origin/no_banner_no_scaffold_annotations_II")
+        dataset_dir = os.path.join(here, "resources")
+        OnDiskFiles().setup_dataset(dataset_dir, self._max_size)
+        ManifestDataFrame().setup_dataframe(dataset_dir)
+        errors = get_errors()
+
+        self.assertEqual(3, len(errors))
+
+        fix_errors(errors)
+
+        remaining_errors = get_errors()
+
+        self.assertEqual(0, len(remaining_errors))
+
+    def test_annotate_bare_scaffold_multiple_views_thumbnails(self):
+        dulwich_checkout(self._repo, b"origin/no_scaffold_annotations_multiple_views")
+        dataset_dir = os.path.join(here, "resources")
+        OnDiskFiles().setup_dataset(dataset_dir, self._max_size)
+        ManifestDataFrame().setup_dataframe(dataset_dir)
+        errors = get_errors()
+
+        self.assertEqual(5, len(errors))
 
         fix_errors(errors)
 
