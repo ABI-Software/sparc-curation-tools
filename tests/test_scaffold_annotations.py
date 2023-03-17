@@ -32,6 +32,14 @@ class ScaffoldAnnotationTestCase(unittest.TestCase):
     def tearDown(self):
         dulwich_proper_stash_and_drop(self._repo)
 
+    def test_correct_annotations(self):
+        dulwich_checkout(self._repo, b"origin/scaffold_annotations_correct")
+        dataset_dir = os.path.join(here, "resources")
+        OnDiskFiles().setup_dataset(dataset_dir, self._max_size)
+        ManifestDataFrame().setup_dataframe(dataset_dir)
+        errors = get_errors()
+        self.assertEqual(0, len(errors))
+
     def test_clear_deprecated_annotations(self):
         dulwich_checkout(self._repo, b"origin/no_banner_bad_old_scaffold_annotations")
         dataset_dir = os.path.join(here, "resources")
