@@ -3,14 +3,16 @@ import json
 import os
 from pathlib import Path
 import pandas as pd
+
+from sparc.curation.tools.plot_utilities import create_thumbnail_from_plot
+
 try:
     import plotly.express as px
-    no_plotly = False
 except ImportError:
-    no_plotly = True
+    px = None
+
 
 from sparc.curation.tools.base import Singleton
-
 
 ZINC_GRAPHICS_TYPES = ["points", "lines", "surfaces", "contours", "streamlines"]
 
@@ -62,7 +64,7 @@ def test_for_view(json_data):
     return is_view
 
 
-def get_plot(csv_file, is_tsv = False):
+def get_plot(csv_file, is_tsv=False):
     if is_tsv:
         plot_df = pd.read_csv(csv_file, sep='\t')
     else:
@@ -76,7 +78,7 @@ def get_plot(csv_file, is_tsv = False):
             x_loc = plot_df.columns.get_loc("time")
             if x_loc != 0:
                 y_loc = list(range(x_loc + 1, len(plot_df.columns)))
-            plot = OnDiskFiles.Plot(csv_file, "timeseries", x = x_loc, y = y_loc)
+            plot = OnDiskFiles.Plot(csv_file, "timeseries", x=x_loc, y=y_loc)
         else:
             plot = OnDiskFiles.Plot(csv_file, "heatmap")
     else:
@@ -87,17 +89,14 @@ def get_plot(csv_file, is_tsv = False):
         for column in plot_df.columns[:3]:
             if plot_df[column].is_monotonic_increasing and plot_df[column].is_unique:
                 if x_loc != 0:
-                    y_loc = list(range(x_loc + 1, len(df.columns)))
-                plot = OnDiskFiles.Plot(csv_file, "timeseries", x = x_loc, y = y_loc, no_header = True)
+                    y_loc = list(range(x_loc + 1, len(plot_df.columns)))
+                plot = OnDiskFiles.Plot(csv_file, "timeseries", x=x_loc, y=y_loc, no_header=True)
                 break
             x_loc += 1
         if not plot:
-            plot = OnDiskFiles.Plot(csv_file, "heatmap", no_header = True)
+            plot = OnDiskFiles.Plot(csv_file, "heatmap", no_header=True)
     return plot
 
-# TODO check plot
-def test_for_plot(csv_file):
-    plot = OnDiskFiles.Plot(csv_file, "heatmap")
 
 def is_context_data_file(json_data):
     if json_data:
@@ -199,11 +198,19 @@ def search_for_metadata_files(dataset_dir, max_size):
     return metadata, metadata_views
 
 
-def search_for_thumbnail_files(dataset_dir):
-    result = list(Path(dataset_dir).rglob("*thumbnail*"))
-    list(Path(dataset_dir).rglob("*.png"))
-    list(Path(dataset_dir).rglob("*.jpeg"))
-    list(Path(dataset_dir).rglob("*.jpg"))
+def search_for_thumbnail_files(dataset_dir, view_files):
+    potential_thumbnails = list(Path(dataset_dir).rglob("*thumbnail*"))
+    potential_thumbnails += list(Path(dataset_dir).rglob("*.png"))
+    potential_thumbnails += list(Path(dataset_dir).rglob("*.jpeg"))
+    potential_thumbnails += list(Path(dataset_dir).rglob("*.jpg"))
+    potential_thumbnails = list(set(potential_thumbnails))
+
+    result = []
+    for view_file in view_files:
+        view_dir = os.path.dirname(view_file)
+        result.extend([image_file for image_file in potential_thumbnails if view_dir == os.path.dirname(image_file)])
+
+    result = list(set(result))
     # For each result:
     #   - Is this file actually an image?
     # Probably just leave this for now and go with the simple name comparison.
@@ -221,7 +228,8 @@ def search_for_view_files(dataset_dir, max_size):
 
     return metadata
 
-def search_for_plot_files(dataset_dir, max_size):
+
+def search_for_plot_files(dataset_dir):
     plot_file = []
     csv_files = list(Path(os.path.join(dataset_dir, "primary")).rglob("*csv"))
     for r in csv_files:
@@ -230,11 +238,11 @@ def search_for_plot_files(dataset_dir, max_size):
             plot_file.append(csv_plot)
     tsv_files = list(Path(os.path.join(dataset_dir, "primary")).rglob("*tsv"))
     for r in tsv_files:
-        tsv_plot = get_plot(r, is_tsv = True)
+        tsv_plot = get_plot(r, is_tsv=True)
         if tsv_plot:
             tsv_plot.delimiter = "tab"
             plot_file.append(tsv_plot)
-    
+
     txt_files = list(Path(os.path.join(dataset_dir, "primary")).rglob("*txt"))
     for r in txt_files:
         csv_location = create_csv_from_txt(r)
@@ -243,6 +251,7 @@ def search_for_plot_files(dataset_dir, max_size):
             plot_file.append(csv_plot)
 
     return plot_file
+
 
 def create_csv_from_txt(r):
     data = open(r)
@@ -270,6 +279,7 @@ def create_csv_from_txt(r):
         write = csv.writer(f)
         write.writerows(csv_rows)
     return csv_file_name
+
 
 class OnDiskFiles(metaclass=Singleton):
     # dataFrame_dir = ""
@@ -299,13 +309,13 @@ class OnDiskFiles(metaclass=Singleton):
 
         '''
 
-        def set_metadate_files(self, files, metadata_views):
+        def set_metadata_files(self, files, metadata_views):
             self._scaffold_files['metadata'] = files
             self._metadata_views = metadata_views
 
         def get_metadata_files(self):
             return self._scaffold_files['metadata']
-        
+
         def get_metadata_children_files(self):
             return self._metadata_views
 
@@ -322,16 +332,16 @@ class OnDiskFiles(metaclass=Singleton):
             return self._scaffold_files['thumbnail']
 
     class Plot(object):
-        def __init__(self, location, plot_type, no_header = False, delimiter = 'comma', x = 0, y = [], row_major = False, thumbnail = None):
+        def __init__(self, location, plot_type, no_header=False, delimiter='comma', x=0, y=None, row_major=False, thumbnail=None):
             self.location = location
             self.plot_type = plot_type
             self.x_axis_column = x
             self.delimiter = delimiter
-            self.y_axes_columns = y
+            self.y_axes_columns = [] if y is None else y
             self.no_header = no_header
             self.row_major = row_major
             self.thumbnail = thumbnail
-        
+
         def set_thumbnail(self, thumbnail):
             self.thumbnail = thumbnail
 
@@ -349,6 +359,7 @@ class OnDiskFiles(metaclass=Singleton):
 
     def generate_plot_thumbnail(self):
         for plot in self._plot_files:
+            plot_df = None
             if plot.location.suffix == ".tsv" and not plot.no_header:
                 plot_df = pd.read_csv(plot.location, sep='\t')
                 plot_df.columns = plot_df.columns.str.lower()
@@ -360,33 +371,18 @@ class OnDiskFiles(metaclass=Singleton):
             elif plot.location.suffix == ".csv" and plot.no_header:
                 plot_df = pd.read_csv(plot.location, header=None)
 
-            fig = None
-
-            if no_plotly:
-                print("Plotly is not available, install for figure plotting functionality.")
+            if px is None:
+                print("Plotly is not available, install for thumbnail generating functionality.")
             else:
-                if plot.plot_type == "timeseries" and not plot.no_header:
-                    fig = px.scatter(plot_df, x = "time", y=plot_df.columns[plot.x_axis_column + 1:])
-                elif plot.plot_type == "heatmap" and not plot.no_header:
-                    fig = px.imshow(plot_df)
-                elif plot.plot_type == "timeseries" and plot.no_header:
-                    fig = px.scatter(plot_df, x = plot_df.columns[plot.x_axis_column], y=plot_df.columns[plot.x_axis_column + 1:])
-                elif plot.plot_type == "heatmap" and plot.no_header:
-                    fig = px.imshow(plot_df, x = plot_df.iloc[0], y = plot_df[0])
-
-            if fig:
-                fig_path = os.path.splitext(plot.location)[0]
-                fig_name = fig_path + '.jpg'
-                fig.write_image(fig_name)
-                plot.set_thumbnail(os.path.join(os.path.dirname(plot.location), fig_name))
+                create_thumbnail_from_plot(plot, plot_df)
 
     def setup_dataset(self, dataset_dir, max_size):
         self._scaffold = OnDiskFiles.Scaffold()
         scaffold_files_dir = os.path.join(dataset_dir, "derivative")
         metadata_file, metadata_views = search_for_metadata_files(scaffold_files_dir, max_size)
-        self._scaffold.set_metadate_files(metadata_file, metadata_views)
+        self._scaffold.set_metadata_files(metadata_file, metadata_views)
         self._scaffold.set_view_files(search_for_view_files(scaffold_files_dir, max_size))
-        self._scaffold.set_thumbnail_files(search_for_thumbnail_files(scaffold_files_dir))
-        self._plot_files = search_for_plot_files(dataset_dir, max_size)
+        self._scaffold.set_thumbnail_files(search_for_thumbnail_files(scaffold_files_dir, self._scaffold.get_view_files()))
+        self._plot_files = search_for_plot_files(dataset_dir)
         # self.generate_plot_thumbnail()
         return self
