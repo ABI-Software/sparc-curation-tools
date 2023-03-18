@@ -347,13 +347,8 @@ class ManifestDataFrame(metaclass=Singleton):
                     manifest_derived_from_files.extend(derived_from_files)
 
                 if len(manifest_derived_from_files) == 0:
-                    print('here')
-                    print(i)
-                    print(on_disk_parent_files)
                     errors.append(IncorrectDerivedFromError(i, incorrect_mime, on_disk_parent_files))
                 elif len(manifest_derived_from_files) == 1:
-                    print("derived from files == 1")
-                    print(i, on_disk_parent_files)
                     if i in on_disk_files and manifest_derived_from_files[0] not in on_disk_parent_files:
                         errors.append(IncorrectDerivedFromError(i, incorrect_mime, on_disk_parent_files))
 
