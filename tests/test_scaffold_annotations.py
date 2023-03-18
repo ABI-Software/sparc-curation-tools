@@ -1,6 +1,8 @@
 import os.path
 import unittest
 
+import dulwich.porcelain
+
 from sparc.curation.tools.manifests import ManifestDataFrame
 from sparc.curation.tools.ondisk import OnDiskFiles
 from sparc.curation.tools.scaffold_annotations import get_errors, fix_errors
@@ -95,6 +97,27 @@ class ScaffoldAnnotationTestCase(unittest.TestCase):
         remaining_errors = get_errors()
 
         self.assertEqual(0, len(remaining_errors))
+
+    def test_annotate_bare_multiple_scaffolds(self):
+        dulwich_checkout(self._repo, b"origin/no_scaffold_annotations_multiple_scaffolds")
+        dataset_dir = os.path.join(here, "resources")
+        OnDiskFiles().setup_dataset(dataset_dir, self._max_size)
+        ManifestDataFrame().setup_dataframe(dataset_dir)
+        errors = get_errors()
+
+        self.assertEqual(6, len(errors))
+
+        fix_errors(errors)
+
+        remaining_errors = get_errors()
+
+        self.assertEqual(0, len(remaining_errors))
+
+        for subj in ['subject-01', 'subject-02']:
+            manifest_file = os.path.join(here, 'resources', 'derivative', subj, 'manifest.xlsx')
+            self.assertTrue(os.path.isfile(manifest_file))
+            os.remove(manifest_file)
+            self.assertFalse(os.path.isfile(manifest_file))
 
 
 if __name__ == "__main__":
