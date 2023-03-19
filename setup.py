@@ -32,7 +32,7 @@ readme.append('')
 software_licence = readfile("LICENSE", True)
 software_licence = '\n  '.join(software_licence)
 
-requires = ['pandas', 'openpyxl']
+requires = ['pandas', 'openpyxl', 'tabulate']
 
 setup(
     name='sparc-curation-tools',
