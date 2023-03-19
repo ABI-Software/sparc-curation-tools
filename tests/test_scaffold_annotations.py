@@ -1,7 +1,8 @@
 import os.path
-import unittest
 
-import dulwich.porcelain
+import pandas
+import tabulate
+import unittest
 
 from sparc.curation.tools.manifests import ManifestDataFrame
 from sparc.curation.tools.ondisk import OnDiskFiles
@@ -46,7 +47,7 @@ class ScaffoldAnnotationTestCase(unittest.TestCase):
         OnDiskFiles().setup_dataset(dataset_dir, self._max_size)
         ManifestDataFrame().setup_dataframe(dataset_dir)
         errors = get_errors()
-        self.assertEqual(7, len(errors))
+        self.assertEqual(6, len(errors))
 
         fix_errors(errors)
 
@@ -60,9 +61,11 @@ class ScaffoldAnnotationTestCase(unittest.TestCase):
         OnDiskFiles().setup_dataset(dataset_dir, self._max_size)
         ManifestDataFrame().setup_dataframe(dataset_dir)
         errors = get_errors()
-        self.assertEqual(4, len(errors))
+        self.assertEqual(3, len(errors))
 
-        fix_errors(errors)
+        errors_fixed = fix_errors(errors)
+
+        self.assertTrue(errors_fixed)
 
         remaining_errors = get_errors()
 
@@ -75,7 +78,7 @@ class ScaffoldAnnotationTestCase(unittest.TestCase):
         ManifestDataFrame().setup_dataframe(dataset_dir)
         errors = get_errors()
 
-        self.assertEqual(3, len(errors))
+        self.assertEqual(2, len(errors))
 
         fix_errors(errors)
 
@@ -90,7 +93,7 @@ class ScaffoldAnnotationTestCase(unittest.TestCase):
         ManifestDataFrame().setup_dataframe(dataset_dir)
         errors = get_errors()
 
-        self.assertEqual(5, len(errors))
+        self.assertEqual(3, len(errors))
 
         fix_errors(errors)
 
@@ -105,7 +108,7 @@ class ScaffoldAnnotationTestCase(unittest.TestCase):
         ManifestDataFrame().setup_dataframe(dataset_dir)
         errors = get_errors()
 
-        self.assertEqual(6, len(errors))
+        self.assertEqual(4, len(errors))
 
         fix_errors(errors)
 
@@ -118,6 +121,50 @@ class ScaffoldAnnotationTestCase(unittest.TestCase):
             self.assertTrue(os.path.isfile(manifest_file))
             os.remove(manifest_file)
             self.assertFalse(os.path.isfile(manifest_file))
+
+    def test_annotate_scaffold_with_additional_images(self):
+        dulwich_checkout(self._repo, b"origin/no_scaffold_annotations_extra_images")
+        dataset_dir = os.path.join(here, "resources")
+        OnDiskFiles().setup_dataset(dataset_dir, self._max_size)
+        ManifestDataFrame().setup_dataframe(dataset_dir)
+        errors = get_errors()
+
+        self.assertEqual(2, len(errors))
+
+        fix_errors(errors)
+
+        remaining_errors = get_errors()
+
+        self.assertEqual(0, len(remaining_errors))
+
+        manifest_file = os.path.join(here, 'resources', 'derivative', 'manifest.xlsx')
+
+        self.assertTrue(os.path.isfile(manifest_file))
+        os.remove(manifest_file)
+        self.assertFalse(os.path.isfile(manifest_file))
+
+
+def print_as_table(xlsx_file):
+    df = pandas.read_excel(xlsx_file)
+
+    headers = [table_header(header) for header in df.keys()]
+    print(tabulate.tabulate(df, headers=headers, tablefmt='simple'))
+
+
+def print_errors(errors):
+    for i, e in enumerate(errors):
+        print(i + 1, e.get_error_message())
+
+
+def table_header(in_header):
+    if in_header == 'timestamp':
+        return 'ts'
+    elif in_header == 'file type':
+        return 'type'
+    elif in_header.startswith('Unnamed'):
+        return '*'
+
+    return in_header
 
 
 if __name__ == "__main__":
