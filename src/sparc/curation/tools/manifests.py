@@ -292,7 +292,7 @@ class ManifestDataFrame(metaclass=Singleton):
 
             on_disk_metadata_files = on_disk.get_scaffold_data().get_metadata_files()
             on_disk_view_files = on_disk.get_scaffold_data().get_view_files()
-            on_disk_thumbnail_files = on_disk.get_scaffold_data().get_thumbnail_files()
+            # on_disk_thumbnail_files = on_disk.get_scaffold_data().get_thumbnail_files()
 
             manifest_metadata_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_META_MIME, FILE_LOCATION_COLUMN)
             for i in on_disk_metadata_files:
@@ -304,10 +304,11 @@ class ManifestDataFrame(metaclass=Singleton):
                 if i not in manifest_view_files:
                     errors.append(NotAnnotatedError(i, SCAFFOLD_VIEW_MIME))
 
-            manifest_thumbnail_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_THUMBNAIL_MIME, FILE_LOCATION_COLUMN)
-            for i in on_disk_thumbnail_files:
-                if i not in manifest_thumbnail_files:
-                    errors.append(NotAnnotatedError(i, SCAFFOLD_THUMBNAIL_MIME))
+            # Derive thumbnail files from view files, now we don't consider all image files to be annotation errors.
+            # manifest_thumbnail_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_THUMBNAIL_MIME, FILE_LOCATION_COLUMN)
+            # for i in on_disk_thumbnail_files:
+            #     if i not in manifest_thumbnail_files:
+            #         errors.append(NotAnnotatedError(i, SCAFFOLD_THUMBNAIL_MIME))
 
             return errors
 
@@ -408,6 +409,39 @@ class ManifestDataFrame(metaclass=Singleton):
 
             view_source_of_errors = self._process_incorrect_source_of(on_disk_view_files, on_disk_thumbnail_files, manifest_view_files, SCAFFOLD_VIEW_MIME)
             errors.extend(view_source_of_errors)
+
+            return errors
+
+        def get_incorrect_complementary(self, on_disk):
+            errors = []
+
+            manifest_view_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_VIEW_MIME, FILE_LOCATION_COLUMN)
+            on_disk_thumbnail_files = on_disk.get_scaffold_data().get_thumbnail_files()
+
+            for i in manifest_view_files:
+                manifest_source_of = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, i, SOURCE_OF_COLUMN)
+
+                if pd.isna(manifest_source_of) or len(manifest_source_of) == 0:
+                    match_rating = [calculate_match(tt, i) for tt in on_disk_thumbnail_files]
+                    max_value = max(match_rating)
+                    max_index = match_rating.index(max_value)
+                    errors.append(NotAnnotatedError(on_disk_thumbnail_files[max_index], SCAFFOLD_THUMBNAIL_MIME))
+                else:
+                    source_of_files_list = []
+                    source_ofs = manifest_source_of[0].split("\n")
+                    for source_of in source_ofs:
+                        source_of_files = self._parent.get_matching_entry(FILENAME_COLUMN, source_of, FILE_LOCATION_COLUMN)
+                        source_of_files_list.extend(source_of_files)
+
+                    manifest_filename = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, i, FILENAME_COLUMN)
+                    for source_of in source_of_files_list:
+                        values = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, source_of, DERIVED_FROM_COLUMN)
+                        mimetypes = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, source_of, ADDITIONAL_TYPES_COLUMN)
+                        if mimetypes[0] != SCAFFOLD_THUMBNAIL_MIME:
+                            errors.append(NotAnnotatedError(source_of, SCAFFOLD_THUMBNAIL_MIME))
+
+                        if not values[0]:
+                            errors.append(IncorrectDerivedFromError(source_of, SCAFFOLD_THUMBNAIL_MIME, manifest_filename))
 
             return errors
 

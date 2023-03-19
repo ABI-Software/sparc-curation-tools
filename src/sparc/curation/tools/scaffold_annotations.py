@@ -34,12 +34,19 @@ def check_source_of_annotations():
     return errors
 
 
+def check_complementary_annotations():
+    errors = []
+    errors.extend(ManifestDataFrame().get_scaffold_data().get_incorrect_complementary(OnDiskFiles()))
+    return errors
+
+
 def get_errors():
     errors = []
     errors.extend(check_for_old_annotations())
     errors.extend(check_additional_types_annotations())
     errors.extend(check_derived_from_annotations())
     errors.extend(check_source_of_annotations())
+    errors.extend(check_complementary_annotations())
     return errors
 
 
@@ -84,16 +91,24 @@ def fix_error(error):
 
 def fix_errors(errors):
     failed = False
+    index = 0
     while not failed and len(errors) > 0:
-        current_error = errors[0]
+        current_error = errors[index]
 
         fix_error(current_error)
 
-        errors = get_errors()
+        new_errors = get_errors()
+        old_errors = errors[:]
+        errors = new_errors
 
-        error_comparison = [error == current_error for error in errors]
-        if any(error_comparison):
-            failed = True
+        if old_errors == new_errors:
+            index += 1
+            if index == len(errors):
+                failed = True
+        else:
+            index = 0
+
+    return not failed
 
 
 def main():
