@@ -34,3 +34,17 @@ def is_same_file(path1, path2):
             return path1 == path2
 
     return False
+
+
+def get_absolute_path(dataset_dir, filename):
+    if os.path.isabs(filename):
+        return filename
+    if filename.startswith("files"):
+        return os.path.join(dataset_dir, filename)
+    if os.path.exists(os.path.join(dataset_dir, "files")):
+        dataset_dir = os.path.join(dataset_dir, "files")
+    if filename.startswith("derivative"):
+        return os.path.join(dataset_dir, filename)
+    if os.path.exists(os.path.join(dataset_dir, "derivative")):
+        dataset_dir = os.path.join(dataset_dir, "derivative")
+    return os.path.join(dataset_dir, filename)

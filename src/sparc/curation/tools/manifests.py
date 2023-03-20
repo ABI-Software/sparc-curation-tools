@@ -88,7 +88,7 @@ class ManifestDataFrame(metaclass=Singleton):
 
     def get_plot_data(self):
         return self._scaffold_data
-        
+
     def get_dataset_dir(self):
         return self._dataset_dir
 
@@ -204,8 +204,9 @@ class ManifestDataFrame(metaclass=Singleton):
                 mDF[column_name] = ""
 
             if append:
-                mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name] = mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name] + "\n" + content
-                mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name] = mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name].fillna(content)
+                mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name] = mDF.loc[mDF[FILENAME_COLUMN]
+                                                                                             == row[FILENAME_COLUMN], column_name].fillna(content)
+                mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name].apply(lambda x: x + "\n" + content if content not in x.split("\n") else x)
             else:
                 mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name] = content
 
@@ -380,7 +381,8 @@ class ManifestDataFrame(metaclass=Singleton):
             view_derived_from_errors = self._process_incorrect_derived_from(on_disk_view_files, on_disk_metadata_files, manifest_view_files, SCAFFOLD_VIEW_MIME)
             errors.extend(view_derived_from_errors)
 
-            thumbnail_derived_from_errors = self._process_incorrect_derived_from(on_disk_thumbnail_files, on_disk_view_files, manifest_thumbnail_files, SCAFFOLD_THUMBNAIL_MIME)
+            thumbnail_derived_from_errors = self._process_incorrect_derived_from(
+                on_disk_thumbnail_files, on_disk_view_files, manifest_thumbnail_files, SCAFFOLD_THUMBNAIL_MIME)
             errors.extend(thumbnail_derived_from_errors)
 
             return errors
@@ -416,7 +418,8 @@ class ManifestDataFrame(metaclass=Singleton):
             manifest_metadata_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_META_MIME, FILE_LOCATION_COLUMN)
             manifest_view_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_VIEW_MIME, FILE_LOCATION_COLUMN)
 
-            metadata_source_of_errors = self._process_incorrect_source_of(on_disk_metadata_files, on_disk_view_files, manifest_metadata_files, SCAFFOLD_META_MIME)
+            metadata_source_of_errors = self._process_incorrect_source_of(
+                on_disk_metadata_files, on_disk_view_files, manifest_metadata_files, SCAFFOLD_META_MIME)
             errors.extend(metadata_source_of_errors)
 
             view_source_of_errors = self._process_incorrect_source_of(on_disk_view_files, on_disk_thumbnail_files, manifest_view_files, SCAFFOLD_VIEW_MIME)
