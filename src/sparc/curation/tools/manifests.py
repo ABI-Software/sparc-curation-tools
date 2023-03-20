@@ -8,7 +8,7 @@ from sparc.curation.tools.errors import IncorrectAnnotationError, NotAnnotatedEr
 from sparc.curation.tools.base import Singleton
 from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN, FILENAME_COLUMN, SUPPLEMENTAL_JSON_COLUMN, \
     ADDITIONAL_TYPES_COLUMN, ANATOMICAL_ENTITY_COLUMN, SCAFFOLD_META_MIME, SCAFFOLD_VIEW_MIME, \
-    SCAFFOLD_THUMBNAIL_MIME, SCAFFOLD_DIR_MIME, PLOT_CSV_MIME, PLOT_TSV_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN, MANIFEST_DIR_COLUMN, MANIFEST_FILENAME, SHEET_NAME_COLUMN, \
+    SCAFFOLD_THUMBNAIL_MIME, PLOT_CSV_MIME, PLOT_TSV_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN, MANIFEST_DIR_COLUMN, MANIFEST_FILENAME, SHEET_NAME_COLUMN, \
     OLD_SCAFFOLD_MIMES
 from sparc.curation.tools.utilities import is_same_file
 
@@ -123,18 +123,24 @@ class ManifestDataFrame(metaclass=Singleton):
         return filenames[0]
 
     def scaffold_get_metadata_files(self):
-        return self.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_META_MIME)
+        return self.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_META_MIME, FILE_LOCATION_COLUMN)
 
     def scaffold_get_plot_files(self):
         return self.get_matching_entry(ADDITIONAL_TYPES_COLUMN, PLOT_CSV_MIME) + self.get_matching_entry(ADDITIONAL_TYPES_COLUMN, PLOT_TSV_MIME)
 
+    def get_manifest_directory(self, file_location):
+        return self.get_matching_entry(FILE_LOCATION_COLUMN, file_location, MANIFEST_DIR_COLUMN)
+
     def get_derived_from(self, file_location):
-        return self.get_matching_entry(DERIVED_FROM_COLUMN, file_location)
+        return self.get_matching_entry(FILE_LOCATION_COLUMN, file_location, DERIVED_FROM_COLUMN)
 
     def get_source_of(self, file_location):
-        return self.get_entry_that_includes(SOURCE_OF_COLUMN, file_location)
+        return self.get_entry_that_includes(FILE_LOCATION_COLUMN, file_location, SOURCE_OF_COLUMN)
 
-    def get_file_dataframe(self, file_location, manifest_dir = None):
+    def get_filename(self, file_location):
+        return self.get_entry_that_includes(FILE_LOCATION_COLUMN, file_location, FILENAME_COLUMN)
+
+    def get_file_dataframe(self, file_location, manifest_dir=None):
         """
         Get file dataframe which match the file_location
         """
@@ -264,8 +270,14 @@ class ManifestDataFrame(metaclass=Singleton):
 
             self._parent.update_column_content(file_location, SOURCE_OF_COLUMN, "\n".join(target_filenames))
 
+        def resolve_file_location(self, source, filename):
+            return self._parent.get_manifest_dirname(source)
+
         def get_metadata_filenames(self):
             return self._parent.scaffold_get_metadata_files()
+
+        def get_filename(self, source):
+            return self._parent.get_filename(source)
 
         def get_plot_filenames(self):
             return self._parent.scaffold_get_plot_files()
@@ -275,6 +287,9 @@ class ManifestDataFrame(metaclass=Singleton):
 
         def get_source_of_filenames(self, source):
             return self._parent.get_source_of(source)
+
+        def get_manifest_directory(self, source):
+            return self._parent.get_manifest_directory(source)[0]
 
         def get_old_annotations(self):
             errors = []
