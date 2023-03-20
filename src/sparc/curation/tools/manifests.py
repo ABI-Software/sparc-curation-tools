@@ -171,7 +171,7 @@ class ManifestDataFrame(metaclass=Singleton):
         return fileDF
 
     def update_plot_annotation(self, manifest_dir, file_location, supplemental_json_data, thumbnail_location):
-        fileDF = self.get_file_dataframe(file_location, manifest_dir)
+        # fileDF = self.get_file_dataframe(file_location, manifest_dir)
 
         if file_location.suffix == ".csv":
             self.update_additional_type(file_location, PLOT_CSV_MIME)
@@ -179,7 +179,7 @@ class ManifestDataFrame(metaclass=Singleton):
             self.update_additional_type(file_location, PLOT_TSV_MIME)
         self.update_supplemental_json(file_location, supplemental_json_data)
 
-        # Antotate Thumbnail file
+        # Annotate thumbnail file
         if thumbnail_location:
             self.get_file_dataframe(thumbnail_location, manifest_dir)
             self.update_additional_type(thumbnail_location, SCAFFOLD_THUMBNAIL_MIME)
@@ -430,6 +430,7 @@ class ManifestDataFrame(metaclass=Singleton):
             manifest_view_files = self._parent.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_VIEW_MIME, FILE_LOCATION_COLUMN)
             on_disk_thumbnail_files = on_disk.get_scaffold_data().get_thumbnail_files()
 
+            incorrect_derived_from_errors = []
             for i in manifest_view_files:
                 manifest_source_of = self._parent.get_matching_entry(FILE_LOCATION_COLUMN, i, SOURCE_OF_COLUMN)
 
@@ -453,8 +454,9 @@ class ManifestDataFrame(metaclass=Singleton):
                             errors.append(NotAnnotatedError(source_of, SCAFFOLD_THUMBNAIL_MIME))
 
                         if not values[0]:
-                            errors.append(IncorrectDerivedFromError(source_of, SCAFFOLD_THUMBNAIL_MIME, manifest_filename))
+                            incorrect_derived_from_errors.append(IncorrectDerivedFromError(source_of, SCAFFOLD_THUMBNAIL_MIME, manifest_filename))
 
+            errors.extend(incorrect_derived_from_errors)
             return errors
 
 

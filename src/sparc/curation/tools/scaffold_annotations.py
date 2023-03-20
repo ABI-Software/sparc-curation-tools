@@ -44,9 +44,9 @@ def get_errors():
     errors = []
     errors.extend(check_for_old_annotations())
     errors.extend(check_additional_types_annotations())
+    errors.extend(check_complementary_annotations())
     errors.extend(check_derived_from_annotations())
     errors.extend(check_source_of_annotations())
-    errors.extend(check_complementary_annotations())
     return errors
 
 
