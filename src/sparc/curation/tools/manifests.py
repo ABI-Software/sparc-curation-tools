@@ -270,9 +270,6 @@ class ManifestDataFrame(metaclass=Singleton):
 
             self._parent.update_column_content(file_location, SOURCE_OF_COLUMN, "\n".join(target_filenames))
 
-        def resolve_file_location(self, source, filename):
-            return self._parent.get_manifest_dirname(source)
-
         def get_metadata_filenames(self):
             return self._parent.scaffold_get_metadata_files()
 
