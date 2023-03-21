@@ -45,7 +45,7 @@ banner: {self._banner}
         self._samples = data["samples"] if "samples" in data else self._samples
         self._views = data["views"] if "views" in data else self._views
 
-    def get_context_json(self):
+    def as_dict(self):
         data = {
             "version": self._version,
             "id": "sparc.science.context_data",
