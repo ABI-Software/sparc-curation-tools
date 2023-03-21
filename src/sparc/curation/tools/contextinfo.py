@@ -14,11 +14,19 @@ class ContextInfoAnnotation(object):
         self._views = []
 
     def __str__(self):
+        v_str = ''
+        for v in self._views:
+            v_str += "\n" + str(v)
+        s_str = ''
+        for s in self._samples:
+            s_str += "\n" + str(s)
         return f"""version: {self._version}
 heading: {self._context_heading}
 banner: {self._banner}
 #samples: {len(self._samples)}
+{s_str}
 #views: {len(self._views)}
+{v_str}
 """
 
     def from_dict(self, data):
