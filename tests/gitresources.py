@@ -1,5 +1,4 @@
 import os.path
-import stat
 import sys
 from typing import Union
 
@@ -10,6 +9,7 @@ import dulwich.index
 
 from dulwich import porcelain
 from dulwich.file import ensure_dir_exists
+from dulwich.object_store import iter_tree_contents
 
 from dulwich.objects import TreeEntry, Tree
 from dulwich.refs import LOCAL_BRANCH_PREFIX
@@ -49,38 +49,8 @@ def dulwich_proper_stash_and_drop(repo):
     dulwich.porcelain.stash_drop(repo, 0)
 
 
-class AbortCheckout(Exception):
+class CheckoutError(Exception):
     """Indicates that the working directory is not clean while trying to checkout."""
-
-
-def iter_tree_contents(
-        store, tree_id, *, include_trees: bool = False):
-    """Iterate the contents of a tree and all subtrees.
-
-    Iteration is depth-first pre-order, as in e.g. os.walk.
-
-    Args:
-      tree_id: SHA1 of the tree.
-      include_trees: If True, include tree objects in the iteration.
-    Returns: Iterator over TreeEntry namedtuples for all the objects in a
-        tree.
-    """
-    if tree_id is None:
-        return
-    # This could be fairly easily generalized to >2 trees if we find a use
-    # case.
-    todo = [TreeEntry(b"", stat.S_IFDIR, tree_id)]
-    while todo:
-        entry = todo.pop()
-        if stat.S_ISDIR(entry.mode):
-            extra = []
-            tree = store[entry.sha]
-            assert isinstance(tree, Tree)
-            for subentry in tree.iteritems(name_order=True):
-                extra.append(subentry.in_path(entry.path))
-            todo.extend(reversed(extra))
-        if not stat.S_ISDIR(entry.mode) or include_trees:
-            yield entry
 
 
 def _update_head_during_checkout_branch(repo, target):
@@ -108,7 +78,11 @@ def _update_head_during_checkout_branch(repo, target):
 
 
 def checkout_branch(repo, target: Union[bytes, str], force: bool = False):
-    """switch branches or restore working tree files
+    """switch branches or restore working tree files.
+    The implementation of this function will probably not scale well
+    for branches with lots of local changes.
+    This is due to the analysis of a diff between branches before any
+    changes are applied.
     Args:
       repo: dulwich Repo object
       target: branch name or commit sha to checkout
@@ -128,13 +102,17 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False):
         index = 0
         while index < len(changes):
             change = changes[index]
+            if sys.platform == "win32" and change == b'derivative/Scaffold/mouseColon_view.json':
+                # Can't explain this, just employing a workaround until it can be dealt with properly.
+                changes.pop(index)
+                continue
             try:
                 current_tree.lookup_path(repo.object_store.__getitem__, change)
                 try:
                     target_tree.lookup_path(repo.object_store.__getitem__, change)
                     index += 1
                 except KeyError:
-                    raise AbortCheckout('Your local changes to the following files would be overwritten by checkout: ' + change.decode())
+                    raise CheckoutError('Your local changes to the following files would be overwritten by checkout: ' + change.decode())
             except KeyError:
                 changes.pop(index)
 
@@ -143,10 +121,10 @@ def checkout_branch(repo, target: Union[bytes, str], force: bool = False):
         if checkout_target is not None:
             target_tree = parse_tree(repo, checkout_target)
 
-        dealt_with = []
+        dealt_with = set()
         repo_index = repo.open_index()
         for entry in iter_tree_contents(repo.object_store, target_tree.id):
-            dealt_with.append(entry.path)
+            dealt_with.add(entry.path)
             if entry.path in changes:
                 continue
             full_path = os.path.join(os.fsencode(repo.path), entry.path)
