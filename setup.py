@@ -34,6 +34,12 @@ software_licence = '\n  '.join(software_licence)
 
 requires = ['pandas', 'openpyxl', 'tabulate']
 
+extras_require = {
+    'test': [
+        'dulwich'
+    ]
+}
+
 setup(
     name='sparc-curation-tools',
     version=version,
@@ -57,4 +63,5 @@ setup(
     include_package_data=True,
     zip_safe=False,
     install_requires=requires,
+    extras_require=extras_require,
 )

@@ -20,7 +20,7 @@ jobs:
       - name: Install requirements
         run: |
           python -V
-          pip install -e .
+          pip install -e .[test]
       - name: Execute tests
         run: |
           python -m unittest discover tests
