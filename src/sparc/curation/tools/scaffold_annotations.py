@@ -2,45 +2,118 @@ import argparse
 import os
 
 from sparc.curation.tools.definitions import MANIFEST_DIR_COLUMN
-from sparc.curation.tools.errors import NotAnnotatedError, IncorrectAnnotationError, IncorrectDerivedFromError, IncorrectSourceOfError, OldAnnotationError
-from sparc.curation.tools.errors import AnnotationDirectoryNoWriteAccess
+from sparc.curation.tools.errors import NotAnnotatedError, IncorrectAnnotationError, IncorrectDerivedFromError, \
+    IncorrectSourceOfError, OldAnnotationError
+from sparc.curation.tools.errormanager import ErrorManager
 from sparc.curation.tools.manifests import ManifestDataFrame
 from sparc.curation.tools.ondisk import OnDiskFiles
 from sparc.curation.tools.utilities import convert_to_bytes
+from sparc.curation.tools.annotations.scaffolds import ScaffoldAnnotations
+
+
+def setup_data(dataset_dir, max_size):
+    """
+    Sets up the dataset by retrieving data from the on-disk files and initializing the manifest dataframe.
+
+    Args:
+        dataset_dir (str): The directory path where the dataset will be set up.
+        max_size (int): The maximum size (in bytes) that the dataset should occupy.
+
+    Returns:
+        None
+    """
+    OnDiskFiles().setup_dataset(dataset_dir, max_size)
+    ManifestDataFrame().setup_dataframe(dataset_dir)
+
+
+def get_scaffold_annotations():
+    """
+    Retrieves the scaffold annotations from the manifest dataframe.
+
+    Returns:
+        ScaffoldAnnotations: An instance of ScaffoldAnnotations for accessing scaffold annotations.
+    """
+    return ScaffoldAnnotations(ManifestDataFrame())
+
+
+def get_scaffold_data_ondisk():
+    """
+    Retrieves the scaffold data from the on-disk files.
+
+    Returns:
+        OnDiskData: An instance of OnDiskData for accessing scaffold data.
+    """
+    return OnDiskFiles().get_scaffold_data()
 
 
 def check_for_old_annotations():
+    """
+    Checks for old annotations in the manifest dataframe.
+
+    Returns:
+        list: A list of errors related to old annotations.
+    """
     errors = []
-    errors += ManifestDataFrame().get_scaffold_data().get_old_annotations()
+    errors += ErrorManager().get_old_annotations()
     return errors
 
 
 def check_additional_types_annotations():
+    """
+    Checks for errors in additional types annotations in the manifest dataframe.
+
+    Returns:
+        list: A list of errors related to additional types annotations.
+    """
     errors = []
-    errors += ManifestDataFrame().get_scaffold_data().get_missing_annotations(OnDiskFiles())
-    errors += ManifestDataFrame().get_scaffold_data().get_incorrect_annotations(OnDiskFiles())
+    errors += ErrorManager().get_missing_annotations()
+    errors += ErrorManager().get_incorrect_annotations()
     return errors
 
 
 def check_derived_from_annotations():
+    """
+    Checks for errors in derived from annotations in the manifest dataframe.
+
+    Returns:
+        list: A list of errors related to derived from annotations.
+    """
     errors = []
-    errors += ManifestDataFrame().get_scaffold_data().get_incorrect_derived_from(OnDiskFiles())
+    errors += ErrorManager().get_incorrect_derived_from()
     return errors
 
 
 def check_source_of_annotations():
+    """
+    Checks for errors in source of annotations in the manifest dataframe.
+
+    Returns:
+        list: A list of errors related to source of annotations.
+    """
     errors = []
-    errors.extend(ManifestDataFrame().get_scaffold_data().get_incorrect_source_of(OnDiskFiles()))
+    errors.extend(ErrorManager().get_incorrect_source_of())
     return errors
 
 
 def check_complementary_annotations():
+    """
+    Checks for errors in complementary annotations in the manifest dataframe.
+
+    Returns:
+        list: A list of errors related to complementary annotations.
+    """
     errors = []
-    errors.extend(ManifestDataFrame().get_scaffold_data().get_incorrect_complementary(OnDiskFiles()))
+    errors.extend(ErrorManager().get_incorrect_complementary())
     return errors
 
 
 def get_errors():
+    """
+    Retrieves all the errors in the manifest dataframe.
+
+    Returns:
+        list: A list of all errors in the manifest dataframe.
+    """
     errors = []
     errors.extend(check_for_old_annotations())
     errors.extend(check_additional_types_annotations())
@@ -66,27 +139,7 @@ def get_confirmation_message(error=None):
 
 
 def fix_error(error):
-    checked_locations = []
-
-    manifest = ManifestDataFrame().get_manifest()
-    if manifest.empty:
-        ManifestDataFrame().create_manifest(error.get_location())
-    else:
-        for manifest_dir in manifest[MANIFEST_DIR_COLUMN]:
-            if manifest_dir not in checked_locations:
-                checked_locations.append(manifest_dir)
-                if not os.access(manifest_dir, os.W_OK):
-                    raise AnnotationDirectoryNoWriteAccess(f"Cannot write to directory {manifest_dir}.")
-
-    # Correct old annotation first, then incorrect annotation, and lastly no annotation.
-    if isinstance(error, OldAnnotationError) or isinstance(error, IncorrectAnnotationError):
-        ManifestDataFrame().update_additional_type(error.get_location(), None)
-    elif isinstance(error, NotAnnotatedError):
-        ManifestDataFrame().update_additional_type(error.get_location(), error.get_mime())
-    elif isinstance(error, IncorrectDerivedFromError):
-        ManifestDataFrame().get_scaffold_data().update_derived_from(error.get_location(), error.get_mime(), error.get_target())
-    elif isinstance(error, IncorrectSourceOfError):
-        ManifestDataFrame().get_scaffold_data().update_source_of(error.get_location(), error.get_mime(), error.get_target())
+    ErrorManager().fix_error(error)
 
 
 def fix_errors(errors):
@@ -114,7 +167,8 @@ def fix_errors(errors):
 def main():
     parser = argparse.ArgumentParser(description='Check scaffold annotations for a SPARC dataset.')
     parser.add_argument("dataset_dir", help='directory to check.')
-    parser.add_argument("-m", "--max-size", help="Set the max size for metadata file. Default is 2MiB", default='2MiB', type=convert_to_bytes)
+    parser.add_argument("-m", "--max-size", help="Set the max size for metadata file. Default is 2MiB", default='2MiB',
+                        type=convert_to_bytes)
     parser.add_argument("-r", "--report", help="Report any errors that were found.", action='store_true')
     parser.add_argument("-f", "--fix", help="Fix any errors that were found.", action='store_true')
 
@@ -144,7 +198,7 @@ def main():
     errors = get_errors()
 
     # Step 4:
-    #   - Report an differences from step 1 and 2.
+    #   - Report a differences from step 1 and 2.
     if args.report:
         for error in errors:
             print(error.get_error_message())

@@ -1,17 +1,19 @@
 import pandas as pd
 
+from sparc.curation.tools.base import Singleton
 from sparc.curation.tools.errors import IncorrectAnnotationError, NotAnnotatedError, IncorrectDerivedFromError, \
-    IncorrectSourceOfError, OldAnnotationError
-from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN, FILENAME_COLUMN, ADDITIONAL_TYPES_COLUMN, \
-    SCAFFOLD_META_MIME, SCAFFOLD_VIEW_MIME, SCAFFOLD_THUMBNAIL_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN, \
-    MANIFEST_DIR_COLUMN, OLD_SCAFFOLD_MIMES
+    IncorrectSourceOfError, BadManifestError, OldAnnotationError, AnnotationDirectoryNoWriteAccess
+from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN, FILENAME_COLUMN, SUPPLEMENTAL_JSON_COLUMN, \
+    ADDITIONAL_TYPES_COLUMN, ANATOMICAL_ENTITY_COLUMN, SCAFFOLD_META_MIME, SCAFFOLD_VIEW_MIME, \
+    SCAFFOLD_THUMBNAIL_MIME, PLOT_CSV_MIME, PLOT_TSV_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN, MANIFEST_DIR_COLUMN, \
+    MANIFEST_FILENAME, SHEET_NAME_COLUMN, OLD_SCAFFOLD_MIMES
 from sparc.curation.tools.manifests import ManifestDataFrame
 from sparc.curation.tools.ondisk import OnDiskFiles
 
 
-class ErrorManager:
+class ErrorManager(metaclass=Singleton):
     """
-    This class is to check and manager the different or errors between the annotations in the manifest dataframe and
+    Class to check and manage the different or errors between the annotations in the manifest dataframe and
     the actual files on disk.
     """
 
@@ -28,6 +30,9 @@ class ErrorManager:
         self.update_content()
 
     def update_content(self):
+        """
+        Update the content of the on-disk and manifest files.
+        """
         self.on_disk_metadata_files = self.on_disk.get_scaffold_data().get_metadata_files()
         self.on_disk_view_files = self.on_disk.get_scaffold_data().get_view_files()
         self.on_disk_thumbnail_files = self.on_disk.get_scaffold_data().get_thumbnail_files()
@@ -43,6 +48,12 @@ class ErrorManager:
     # === Find Errors ===
 
     def get_old_annotations(self):
+        """
+        Get errors for old annotations in the manifest dataframe.
+
+        Returns:
+            list: List of OldAnnotationError objects.
+        """
         errors = []
         OLD_ANNOTATIONS = OLD_SCAFFOLD_MIMES
 
@@ -55,6 +66,12 @@ class ErrorManager:
         return errors
 
     def get_missing_annotations(self):
+        """
+        Get errors for missing annotations in the manifest dataframe.
+
+        Returns:
+            list: List of NotAnnotatedError objects.
+        """
         errors = []
 
         for i in self.on_disk_metadata_files:
@@ -74,6 +91,12 @@ class ErrorManager:
         return errors
 
     def get_incorrect_annotations(self):
+        """
+        Get errors for incorrect annotations in the manifest dataframe.
+
+        Returns:
+            list: List of IncorrectAnnotationError objects.
+        """
         errors = []
 
         for i in self.manifest_metadata_files:
@@ -91,6 +114,18 @@ class ErrorManager:
         return errors
 
     def _process_incorrect_derived_from(self, on_disk_files, on_disk_parent_files, manifest_files, incorrect_mime):
+        """
+        Helper method to process incorrect derived from errors.
+
+        Args:
+            on_disk_files (list): List of on-disk files.
+            on_disk_parent_files (list): List of parent files on disk.
+            manifest_files (list): List of files annotated in manifest data frame.
+            incorrect_mime (str): Incorrect MIME type.
+
+        Returns:
+            list: List of IncorrectDerivedFromError objects.
+        """
         errors = []
 
         for i in manifest_files:
@@ -109,6 +144,12 @@ class ErrorManager:
         return errors
 
     def get_incorrect_derived_from(self):
+        """
+        Get errors for incorrect derived from relationships in the manifest dataframe.
+
+        Returns:
+            list: List of IncorrectDerivedFromError objects.
+        """
         errors = []
 
         view_derived_from_errors = self._process_incorrect_derived_from(self.on_disk_view_files,
@@ -124,6 +165,18 @@ class ErrorManager:
         return errors
 
     def _process_incorrect_source_of(self, on_disk_files, on_disk_child_files, manifest_files, incorrect_mime):
+        """
+        Helper method to process incorrect source of errors.
+
+        Args:
+            on_disk_files (list): List of on-disk files.
+            on_disk_child_files (list): List of child files on disk.
+            manifest_files (list): List of manifest files.
+            incorrect_mime (str): Incorrect MIME type.
+
+        Returns:
+            list: List of IncorrectSourceOfError objects.
+        """
         errors = []
 
         for i in manifest_files:
@@ -146,6 +199,12 @@ class ErrorManager:
         return errors
 
     def get_incorrect_source_of(self):
+        """
+        Get errors for incorrect source of relationships in the manifest dataframe.
+
+        Returns:
+            list: List of IncorrectSourceOfError objects.
+        """
         errors = []
 
         metadata_source_of_errors = self._process_incorrect_source_of(
@@ -159,6 +218,12 @@ class ErrorManager:
         return errors
 
     def get_incorrect_complementary(self):
+        """
+        Get errors for incorrect complementary files in the manifest dataframe.
+
+        Returns:
+            list: List of errors.
+        """
         errors = []
 
         incorrect_derived_from_errors = []
@@ -280,8 +345,32 @@ class ErrorManager:
         # Update the 'Source Of' column content with the target filenames
         self.manifest.update_column_content(file_location, SOURCE_OF_COLUMN, "\n".join(target_filenames))
 
+    def fix_error(self, error):
+        # Check files write permission
+        ManifestDataFrame().check_directory_write_permission(error.get_location())
+
+        # Correct old annotation first, then incorrect annotation, and lastly no annotation.
+        if isinstance(error, OldAnnotationError) or isinstance(error, IncorrectAnnotationError):
+            ManifestDataFrame().update_additional_type(error.get_location(), None)
+        elif isinstance(error, NotAnnotatedError):
+            ManifestDataFrame().update_additional_type(error.get_location(), error.get_mime())
+        elif isinstance(error, IncorrectDerivedFromError):
+            ErrorManager().update_derived_from(error.get_location(), error.get_mime(), error.get_target())
+        elif isinstance(error, IncorrectSourceOfError):
+            ErrorManager().update_source_of(error.get_location(), error.get_mime(), error.get_target())
+
 
 def calculate_match(item1, item2):
+    """
+    Calculate the match rating between two items.
+
+    Args:
+        item1 (str): First item.
+        item2 (str): Second item.
+
+    Returns:
+        int: Match rating.
+    """
     common_prefix = ''
 
     for x, y in zip(item1, item2):
@@ -290,4 +379,5 @@ def calculate_match(item1, item2):
         else:
             break
 
+    # Return the match rating as an integer.
     return len(common_prefix)
