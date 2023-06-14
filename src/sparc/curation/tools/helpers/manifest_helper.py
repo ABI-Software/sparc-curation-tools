@@ -4,12 +4,10 @@ from pathlib import Path
 import pandas as pd
 
 from sparc.curation.tools.errors import BadManifestError, AnnotationDirectoryNoWriteAccess
-from sparc.curation.tools.base import Singleton
+from sparc.curation.tools.helpers.base import Singleton
 from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN, FILENAME_COLUMN, SUPPLEMENTAL_JSON_COLUMN, \
-    ADDITIONAL_TYPES_COLUMN, ANATOMICAL_ENTITY_COLUMN, SCAFFOLD_META_MIME, SCAFFOLD_VIEW_MIME, \
-    SCAFFOLD_THUMBNAIL_MIME, PLOT_CSV_MIME, PLOT_TSV_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN, MANIFEST_DIR_COLUMN, \
-    MANIFEST_FILENAME, SHEET_NAME_COLUMN, \
-    OLD_SCAFFOLD_MIMES
+    ADDITIONAL_TYPES_COLUMN, ANATOMICAL_ENTITY_COLUMN, SCAFFOLD_META_MIME, SCAFFOLD_THUMBNAIL_MIME, PLOT_CSV_MIME, PLOT_TSV_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN, MANIFEST_DIR_COLUMN, \
+    MANIFEST_FILENAME, SHEET_NAME_COLUMN
 from sparc.curation.tools.utilities import is_same_file
 
 
@@ -22,7 +20,6 @@ class ManifestDataFrame(metaclass=Singleton):
 
     _manifestDataFrame = None
     _scaffold_data = None
-    _dataset_dir = None
 
     def setup_dataframe(self, dataset_dir):
         """
@@ -34,11 +31,10 @@ class ManifestDataFrame(metaclass=Singleton):
         Returns:
             ManifestDataFrame: The instance of the ManifestDataFrame class.
         """
-        self._dataset_dir = dataset_dir
-        self._read_manifests()
+        self._read_manifests(dataset_dir)
         return self
 
-    def _read_manifests(self, depth=0):
+    def _read_manifests(self, dataset_dir, depth=0):
         """
         Read the manifest files in the dataset directory.
 
@@ -49,7 +45,7 @@ class ManifestDataFrame(metaclass=Singleton):
             BadManifestError: If a manifest sanitization error is found.
         """
         self._manifestDataFrame = pd.DataFrame()
-        for r in Path(self._dataset_dir).rglob(MANIFEST_FILENAME):
+        for r in Path(dataset_dir).rglob(MANIFEST_FILENAME):
             xl_file = pd.ExcelFile(r)
             for sheet_name in xl_file.sheet_names:
                 currentDataFrame = xl_file.parse(sheet_name)
@@ -173,8 +169,8 @@ class ManifestDataFrame(metaclass=Singleton):
         return self.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_META_MIME, FILE_LOCATION_COLUMN)
 
     def scaffold_get_plot_files(self):
-        return self.get_matching_entry(ADDITIONAL_TYPES_COLUMN, PLOT_CSV_MIME) + self.get_matching_entry(
-            ADDITIONAL_TYPES_COLUMN, PLOT_TSV_MIME)
+        return self.get_matching_entry(ADDITIONAL_TYPES_COLUMN, PLOT_CSV_MIME, FILE_LOCATION_COLUMN) + \
+               self.get_matching_entry(ADDITIONAL_TYPES_COLUMN, PLOT_TSV_MIME, FILE_LOCATION_COLUMN)
 
     def get_manifest_directory(self, file_location):
         return self.get_matching_entry(FILE_LOCATION_COLUMN, file_location, MANIFEST_DIR_COLUMN)
@@ -213,7 +209,7 @@ class ManifestDataFrame(metaclass=Singleton):
             newRow.to_excel(os.path.join(manifest_dir, MANIFEST_FILENAME), index=False, header=True)
 
             # Re-read manifests to find dataframe for newly added entry.
-            self._read_manifests()
+            # self._read_manifests()
             fileDF = self._get_matching_dataframe(file_location)
 
         return fileDF
@@ -221,9 +217,9 @@ class ManifestDataFrame(metaclass=Singleton):
     def update_plot_annotation(self, manifest_dir, file_location, supplemental_json_data, thumbnail_location):
         # fileDF = self.get_file_dataframe(file_location, manifest_dir)
 
-        if file_location.suffix == ".csv":
+        if file_location.endswith(".csv"):
             self.update_additional_type(file_location, PLOT_CSV_MIME)
-        elif file_location.suffix == ".tsv":
+        elif file_location.endswith(".tsv"):
             self.update_additional_type(file_location, PLOT_TSV_MIME)
         self.update_supplemental_json(file_location, supplemental_json_data)
 
@@ -265,4 +261,4 @@ class ManifestDataFrame(metaclass=Singleton):
             mDF.to_excel(os.path.join(row[MANIFEST_DIR_COLUMN], MANIFEST_FILENAME), sheet_name=row[SHEET_NAME_COLUMN],
                          index=False, header=True)
 
-        self._read_manifests()
+        # self._read_manifests()

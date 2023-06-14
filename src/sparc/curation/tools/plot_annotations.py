@@ -3,9 +3,11 @@ import re
 import argparse
 import json
 
-from sparc.curation.tools.manifests import ManifestDataFrame
-from sparc.curation.tools.ondisk import OnDiskFiles
+from sparc.curation.tools.helpers.manifest_helper import ManifestDataFrame
+from sparc.curation.tools.helpers.file_helper import OnDiskFiles
 from sparc.curation.tools.utilities import convert_to_bytes
+
+import sparc.curation.tools.plot_utilities as plot_utilities
 
 VERSION = '1.2.0'
 AVAILABLE_PLOT_TYPES = ['heatmap', 'timeseries']
@@ -34,16 +36,42 @@ def flatten_nested_list(nested_list):
             flat_list.append(elem)
     return flat_list
 
-def annotate_plot(dataset_dir, data):
+
+def annotate_all_plot(dataset_dir, data=None):
     max_size = '2000MiB'
-    manifest_dir = os.path.join(dataset_dir, "primary")
     OnDiskFiles().setup_dataset(dataset_dir, convert_to_bytes(max_size))
     ManifestDataFrame().setup_dataframe(dataset_dir)
-    OnDiskFiles().generate_plot_thumbnail()
-    plot_files = OnDiskFiles().get_plot_files()
-    for plot_file in plot_files:
+
+    if data:
+        pass
+        # TODO For script call the annotate all plot method directly
+        # ManifestDataFrame().update_plot_annotation(manifest_dir, plot_file.location, data, plot_file.thumbnail)
+    else:
+        # Check if the plot is already annotated first.
+        annotate_plot_from_plot_paths(OnDiskFiles().get_plot_files())
+
+
+def annotate_plot_from_plot_paths(plot_paths):
+    plot_list = plot_utilities.create_plots_list_from_plot_paths(plot_paths)
+    plot_utilities.generate_plot_thumbnail(plot_list)
+    manifest_dir = os.path.join(OnDiskFiles().get_dataset_dir(), "primary")
+
+    for plot_file in plot_list:
         data = get_plot_annotation_data(plot_file)
         ManifestDataFrame().update_plot_annotation(manifest_dir, plot_file.location, data, plot_file.thumbnail)
+
+
+def get_all_plots_path():
+    return OnDiskFiles().get_plot_files()
+
+
+def get_all_thumbnail_path():
+    return OnDiskFiles().get_thumbnail_files()
+
+
+def get_manifest():
+    return ManifestDataFrame()
+
 
 def get_plot_annotation_data(plot_file):
     attrs = {
@@ -71,6 +99,24 @@ def get_plot_annotation_data(plot_file):
     }
     return json.dumps(data)
 
+
+def get_path_by_name(file_name):
+    return ManifestDataFrame().get_filepath_on_disk(file_name)
+
+def get_confirmation_message(error=None):
+    """
+    "To fix this error, the 'additional types' of 'filename' in 'manifestFile' will be set to 'MIME'."
+    "To fix this error, a manifestFile will be created under manifestDir, and will insert the filename in this manifestFile with 'additional types' MIME."
+
+    "To fix this error, the data of filename in manifestFile will be deleted."
+    """
+    if error is None:
+        return "Let this magic tool annotation plots for you?"
+
+    message = "Let this magic tool annotation this plot for you?"
+    return message
+
+
 def main():
     parser = argparse.ArgumentParser(description='Create an annotation for a SPARC plot. '
                                                  'The Y_AXES_COLUMNS can either be single numbers or a range in the form 5-8. '
@@ -97,7 +143,7 @@ def main():
     
     #TODO
     data = get_plot_annotation_data(args)
-    annotate_plot(dataset_dir, json.dumps(data))
+    annotate_all_plot(dataset_dir, json.dumps(data))
 
 
 if __name__ == "__main__":

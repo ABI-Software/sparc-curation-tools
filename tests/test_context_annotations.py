@@ -4,7 +4,7 @@ import os.path
 import unittest
 
 from sparc.curation.tools import context_annotations
-from sparc.curation.tools.contextinfo import ContextInfoAnnotation
+from sparc.curation.tools.models.contextinfo import ContextInfoAnnotation
 from sparc.curation.tools.utilities import convert_to_bytes
 
 from gitresources import dulwich_checkout, setup_resources, dulwich_proper_stash_and_drop

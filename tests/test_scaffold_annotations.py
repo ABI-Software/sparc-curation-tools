@@ -4,8 +4,8 @@ import pandas
 import tabulate
 import unittest
 
-from sparc.curation.tools.manifests import ManifestDataFrame
-from sparc.curation.tools.ondisk import OnDiskFiles
+from sparc.curation.tools.helpers.manifest_helper import ManifestDataFrame
+from sparc.curation.tools.helpers.file_helper import OnDiskFiles
 from sparc.curation.tools.scaffold_annotations import get_errors, fix_errors
 from sparc.curation.tools.utilities import convert_to_bytes
 

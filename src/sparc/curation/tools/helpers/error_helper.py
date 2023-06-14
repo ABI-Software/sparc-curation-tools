@@ -1,14 +1,14 @@
 import pandas as pd
 
-from sparc.curation.tools.base import Singleton
+from sparc.curation.tools.helpers.base import Singleton
 from sparc.curation.tools.errors import IncorrectAnnotationError, NotAnnotatedError, IncorrectDerivedFromError, \
-    IncorrectSourceOfError, BadManifestError, OldAnnotationError, AnnotationDirectoryNoWriteAccess
-from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN, FILENAME_COLUMN, SUPPLEMENTAL_JSON_COLUMN, \
-    ADDITIONAL_TYPES_COLUMN, ANATOMICAL_ENTITY_COLUMN, SCAFFOLD_META_MIME, SCAFFOLD_VIEW_MIME, \
-    SCAFFOLD_THUMBNAIL_MIME, PLOT_CSV_MIME, PLOT_TSV_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN, MANIFEST_DIR_COLUMN, \
-    MANIFEST_FILENAME, SHEET_NAME_COLUMN, OLD_SCAFFOLD_MIMES
-from sparc.curation.tools.manifests import ManifestDataFrame
-from sparc.curation.tools.ondisk import OnDiskFiles
+    IncorrectSourceOfError, OldAnnotationError
+from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN, FILENAME_COLUMN, ADDITIONAL_TYPES_COLUMN, \
+    SCAFFOLD_META_MIME, SCAFFOLD_VIEW_MIME, \
+    SCAFFOLD_THUMBNAIL_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN, MANIFEST_DIR_COLUMN, \
+    OLD_SCAFFOLD_MIMES
+from sparc.curation.tools.helpers.file_helper import OnDiskFiles
+from sparc.curation.tools.helpers.manifest_helper import ManifestDataFrame
 
 
 class ErrorManager(metaclass=Singleton):
@@ -33,9 +33,9 @@ class ErrorManager(metaclass=Singleton):
         """
         Update the content of the on-disk and manifest files.
         """
-        self.on_disk_metadata_files = self.on_disk.get_scaffold_data().get_metadata_files()
-        self.on_disk_view_files = self.on_disk.get_scaffold_data().get_view_files()
-        self.on_disk_thumbnail_files = self.on_disk.get_scaffold_data().get_thumbnail_files()
+        self.on_disk_metadata_files = self.on_disk.get_metadata_files()
+        self.on_disk_view_files = self.on_disk.get_view_files()
+        self.on_disk_thumbnail_files = self.on_disk.get_thumbnail_files()
 
         self.manifest_metadata_files = self.manifest.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_META_MIME,
                                                                         FILE_LOCATION_COLUMN)

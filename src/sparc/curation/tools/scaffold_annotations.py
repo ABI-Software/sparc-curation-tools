@@ -1,14 +1,9 @@
 import argparse
-import os
 
-from sparc.curation.tools.definitions import MANIFEST_DIR_COLUMN
-from sparc.curation.tools.errors import NotAnnotatedError, IncorrectAnnotationError, IncorrectDerivedFromError, \
-    IncorrectSourceOfError, OldAnnotationError
-from sparc.curation.tools.errormanager import ErrorManager
-from sparc.curation.tools.manifests import ManifestDataFrame
-from sparc.curation.tools.ondisk import OnDiskFiles
+from sparc.curation.tools.helpers.error_helper import ErrorManager
+from sparc.curation.tools.helpers.file_helper import OnDiskFiles
+from sparc.curation.tools.helpers.manifest_helper import ManifestDataFrame
 from sparc.curation.tools.utilities import convert_to_bytes
-from sparc.curation.tools.annotations.scaffolds import ScaffoldAnnotations
 
 
 def setup_data(dataset_dir, max_size):
@@ -26,16 +21,6 @@ def setup_data(dataset_dir, max_size):
     ManifestDataFrame().setup_dataframe(dataset_dir)
 
 
-def get_scaffold_annotations():
-    """
-    Retrieves the scaffold annotations from the manifest dataframe.
-
-    Returns:
-        ScaffoldAnnotations: An instance of ScaffoldAnnotations for accessing scaffold annotations.
-    """
-    return ScaffoldAnnotations(ManifestDataFrame())
-
-
 def get_scaffold_data_ondisk():
     """
     Retrieves the scaffold data from the on-disk files.
@@ -43,7 +28,11 @@ def get_scaffold_data_ondisk():
     Returns:
         OnDiskData: An instance of OnDiskData for accessing scaffold data.
     """
-    return OnDiskFiles().get_scaffold_data()
+    return OnDiskFiles()
+
+
+def get_manifest():
+    return ManifestDataFrame()
 
 
 def check_for_old_annotations():

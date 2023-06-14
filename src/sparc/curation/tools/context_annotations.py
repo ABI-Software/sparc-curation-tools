@@ -4,12 +4,13 @@ from pathlib import Path
 
 from sparc.curation.tools.utilities import get_absolute_path
 from sparc.curation.tools.definitions import CONTEXT_INFO_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN
-from sparc.curation.tools.manifests import ManifestDataFrame
-from sparc.curation.tools.ondisk import is_json_of_type, is_csv_of_type, is_context_data_file, is_annotation_csv_file
+from sparc.curation.tools.helpers.manifest_helper import ManifestDataFrame
+from sparc.curation.tools.helpers.file_helper import OnDiskFiles
+from sparc.curation.tools.helpers.file_helper import is_json_of_type, is_csv_of_type, is_context_data_file, is_annotation_csv_file
 
 
 def get_dataset_dir():
-    return ManifestDataFrame().get_dataset_dir()
+    return OnDiskFiles().get_dataset_dir()
 
 
 def update_context_info(context_info):
