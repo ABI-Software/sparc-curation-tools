@@ -313,17 +313,19 @@ def search_for_plot_files(dataset_dir):
         dict: A dictionary containing lists of CSV and TSV plot file paths.
     """
     plot_files = []
-    csv_files = list(Path(os.path.join(dataset_dir, "primary")).rglob("*csv"))
-    plot_files += csv_files
-
-    tsv_files = list(Path(os.path.join(dataset_dir, "primary")).rglob("*tsv"))
-    plot_files += tsv_files
-
-    txt_files = list(Path(os.path.join(dataset_dir, "primary")).rglob("*txt"))
-    for r in txt_files:
-        csv_location = create_csv_from_txt(r)
-        plot_files.append(csv_location)
-
+    for root, dirs, files in os.walk(dataset_dir):
+        # TODO: Check if it's plot file
+        for filename in files:
+            if filename.endswith(".csv"):
+                csv_file = os.path.join(root, filename)
+                plot_files.append(csv_file)
+            elif filename.endswith(".tsv"):
+                tsv_file = os.path.join(root, filename)
+                plot_files.append(tsv_file)
+            elif filename.endswith(".txt"):
+                txt_file = os.path.join(root, filename)
+                csv_location = create_csv_from_txt(txt_file)
+                plot_files.append(csv_location)
     return plot_files
 
 
@@ -481,4 +483,4 @@ class OnDiskFiles(metaclass=Singleton):
         Returns:
             list: Lists of CSV and TSV plot file paths.
         """
-        return self._plot_files
+        return self._plot_files[:]

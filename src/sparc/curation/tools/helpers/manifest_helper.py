@@ -20,6 +20,7 @@ class ManifestDataFrame(metaclass=Singleton):
 
     _manifestDataFrame = None
     _scaffold_data = None
+    _dataset_dir = None
 
     def setup_dataframe(self, dataset_dir):
         """
@@ -31,10 +32,11 @@ class ManifestDataFrame(metaclass=Singleton):
         Returns:
             ManifestDataFrame: The instance of the ManifestDataFrame class.
         """
-        self._read_manifests(dataset_dir)
+        self._dataset_dir = dataset_dir
+        self._read_manifests()
         return self
 
-    def _read_manifests(self, dataset_dir, depth=0):
+    def _read_manifests(self, depth=0):
         """
         Read the manifest files in the dataset directory.
 
@@ -45,7 +47,7 @@ class ManifestDataFrame(metaclass=Singleton):
             BadManifestError: If a manifest sanitization error is found.
         """
         self._manifestDataFrame = pd.DataFrame()
-        for r in Path(dataset_dir).rglob(MANIFEST_FILENAME):
+        for r in Path(self._dataset_dir).rglob(MANIFEST_FILENAME):
             xl_file = pd.ExcelFile(r)
             for sheet_name in xl_file.sheet_names:
                 currentDataFrame = xl_file.parse(sheet_name)
@@ -135,6 +137,7 @@ class ManifestDataFrame(metaclass=Singleton):
         sanitised = self._sanitise_is_derived_from(column_names)
         return sanitised
 
+    # region -----Get-----
     def _get_matching_dataframe(self, file_location):
         same_file = []
 
@@ -200,6 +203,7 @@ class ManifestDataFrame(metaclass=Singleton):
 
         # If fileDF is empty, means there's no manifest file containing this file's annotation.
         if fileDF.empty:
+            print("manifest_dir", manifest_dir)
             newRow = pd.DataFrame({FILENAME_COLUMN: file_name}, index=[1])
             # Check if there's manifest file under same Scaffold File Dir. If yes get data from it.
             # If no manifest file create new manifest file. Add file to the manifest.
@@ -209,14 +213,15 @@ class ManifestDataFrame(metaclass=Singleton):
             newRow.to_excel(os.path.join(manifest_dir, MANIFEST_FILENAME), index=False, header=True)
 
             # Re-read manifests to find dataframe for newly added entry.
-            # self._read_manifests()
+            self._read_manifests()
             fileDF = self._get_matching_dataframe(file_location)
-
+            # fileDF = newRow
         return fileDF
 
-    def update_plot_annotation(self, manifest_dir, file_location, supplemental_json_data, thumbnail_location):
-        # fileDF = self.get_file_dataframe(file_location, manifest_dir)
+    # endregion
 
+    # region -----Update-----
+    def update_plot_annotation(self, file_location, supplemental_json_data, thumbnail_location):
         if file_location.endswith(".csv"):
             self.update_additional_type(file_location, PLOT_CSV_MIME)
         elif file_location.endswith(".tsv"):
@@ -225,12 +230,10 @@ class ManifestDataFrame(metaclass=Singleton):
 
         # Annotate thumbnail file
         if thumbnail_location:
-            self.get_file_dataframe(thumbnail_location, manifest_dir)
+            self.get_file_dataframe(thumbnail_location)
             self.update_additional_type(thumbnail_location, SCAFFOLD_THUMBNAIL_MIME)
-            self.update_column_content(thumbnail_location, DERIVED_FROM_COLUMN,
-                                       os.path.relpath(file_location, manifest_dir))
-            self.update_column_content(file_location, SOURCE_OF_COLUMN,
-                                       os.path.relpath(thumbnail_location, manifest_dir))
+            self.update_column_content(thumbnail_location, DERIVED_FROM_COLUMN, file_location)
+            self.update_column_content(file_location, SOURCE_OF_COLUMN, thumbnail_location)
 
     def update_additional_type(self, file_location, file_mime):
         self.update_column_content(file_location, ADDITIONAL_TYPES_COLUMN, file_mime)
@@ -247,6 +250,8 @@ class ManifestDataFrame(metaclass=Singleton):
         for index, row in fileDF.iterrows():
             mDF = pd.read_excel(os.path.join(row[MANIFEST_DIR_COLUMN], MANIFEST_FILENAME),
                                 sheet_name=row[SHEET_NAME_COLUMN])
+            if os.path.isabs(content):
+                content = os.path.relpath(content, row[MANIFEST_DIR_COLUMN])
             if column_name not in mDF.columns:
                 mDF[column_name] = ""
 
@@ -261,4 +266,6 @@ class ManifestDataFrame(metaclass=Singleton):
             mDF.to_excel(os.path.join(row[MANIFEST_DIR_COLUMN], MANIFEST_FILENAME), sheet_name=row[SHEET_NAME_COLUMN],
                          index=False, header=True)
 
-        # self._read_manifests()
+        self._read_manifests()
+
+    # endregion
