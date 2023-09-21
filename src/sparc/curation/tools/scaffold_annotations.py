@@ -1,4 +1,5 @@
 import argparse
+import os
 
 from sparc.curation.tools.helpers.error_helper import ErrorManager
 from sparc.curation.tools.helpers.file_helper import OnDiskFiles
@@ -12,29 +13,80 @@ def setup_data(dataset_dir, max_size):
 
     Args:
         dataset_dir (str): The directory path where the dataset will be set up.
-        max_size (int): The maximum size (in bytes) that the dataset should occupy.
+        max_size (str): The maximum size that the dataset should occupy.
 
     Returns:
         None
     """
-    OnDiskFiles().setup_dataset(dataset_dir, max_size)
+    OnDiskFiles().setup_dataset(dataset_dir, convert_to_bytes(max_size))
     ManifestDataFrame().setup_dataframe(dataset_dir)
 
 
-def get_scaffold_data_ondisk():
+# OnDisk section
+def get_on_disk_metadata_files():
+    return OnDiskFiles().get_metadata_files()
+
+
+def get_on_disk_view_files():
+    return OnDiskFiles().get_view_files()
+
+
+def get_on_disk_thumbnail_files():
+    return OnDiskFiles().get_thumbnail_files()
+
+
+# Manifest section
+def get_annotated_scaffold_dictionary():
     """
-    Retrieves the scaffold data from the on-disk files.
+    Build and return a scaffold dictionary based on scaffold annotation in manifest files.
+    The annotated scaffold dictionary has the following structure:
+    {
+        metadata_filename: {
+            view_file: [thumbnail_filenames]
+        }
+    }
 
     Returns:
-        OnDiskData: An instance of OnDiskData for accessing scaffold data.
+        dict: Scaffold dictionary.
     """
-    return OnDiskFiles()
+    manifest = ManifestDataFrame()
+    annotated_scaffold_dictionary = {}
+
+    # Get a list of metadata filenames in the manifest
+    metadata_files = manifest.scaffold_get_metadata_files()
+
+    for metadata_file in metadata_files:
+        # Get the directory where the metadata file is located
+        manifest_dir = manifest.get_manifest_directory(metadata_file)[0]
+
+        # Get a list of view filenames associated with the metadata
+        view_filenames = manifest.get_source_of(metadata_file)
+        # Create an empty dictionary to store view and thumbnail information for this metadata
+        metadata_entry = {}
+
+        # View filenames can have multiple lines separated by a newline.
+        view_filenames = list(filter(None, view_filenames[0].split('\n')))
+
+        for view in view_filenames:
+            view_filename = os.path.join(manifest_dir, view)
+
+            # Get a list of thumbnail filenames associated with the view
+            thumbnail_filenames = manifest.get_source_of(view_filename)
+
+            # Create a list to store thumbnail information for this view
+            view_entry = [os.path.join(manifest_dir, thumbnail) for thumbnail in thumbnail_filenames
+                          if not isinstance(thumbnail, float)]
+
+            # Add the view entry to the metadata entry
+            metadata_entry[view_filename] = view_entry
+
+        # Add the metadata entry to the annotated scaffold dictionary
+        annotated_scaffold_dictionary[metadata_file] = metadata_entry
+
+    return annotated_scaffold_dictionary
 
 
-def get_manifest():
-    return ManifestDataFrame()
-
-
+# Error section
 def check_for_old_annotations():
     """
     Checks for old annotations in the manifest dataframe.
@@ -104,6 +156,7 @@ def get_errors():
         list: A list of all errors in the manifest dataframe.
     """
     errors = []
+    ErrorManager().update_content()
     errors.extend(check_for_old_annotations())
     errors.extend(check_additional_types_annotations())
     errors.extend(check_complementary_annotations())

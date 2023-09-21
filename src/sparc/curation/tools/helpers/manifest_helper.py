@@ -1,25 +1,27 @@
 import os
 from pathlib import Path
-
 import pandas as pd
 
 from sparc.curation.tools.errors import BadManifestError, AnnotationDirectoryNoWriteAccess
 from sparc.curation.tools.helpers.base import Singleton
-from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN, FILENAME_COLUMN, SUPPLEMENTAL_JSON_COLUMN, \
-    ADDITIONAL_TYPES_COLUMN, ANATOMICAL_ENTITY_COLUMN, SCAFFOLD_META_MIME, SCAFFOLD_THUMBNAIL_MIME, PLOT_CSV_MIME, PLOT_TSV_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN, MANIFEST_DIR_COLUMN, \
-    MANIFEST_FILENAME, SHEET_NAME_COLUMN
+from sparc.curation.tools.definitions import (
+    FILE_LOCATION_COLUMN, FILENAME_COLUMN, SUPPLEMENTAL_JSON_COLUMN,
+    ADDITIONAL_TYPES_COLUMN, ANATOMICAL_ENTITY_COLUMN,
+    SCAFFOLD_META_MIME, SCAFFOLD_THUMBNAIL_MIME,
+    PLOT_CSV_MIME, PLOT_TSV_MIME, DERIVED_FROM_COLUMN,
+    SOURCE_OF_COLUMN, MANIFEST_DIR_COLUMN, MANIFEST_FILENAME, SHEET_NAME_COLUMN
+)
 from sparc.curation.tools.utilities import is_same_file
 
 
 class ManifestDataFrame(metaclass=Singleton):
     """
-    A singleton class that represents a manifest data frame.
+    A singleton class for managing manifest data frames.
 
     This class provides methods to manipulate and access data in the manifest data frame.
     """
 
     _manifestDataFrame = None
-    _scaffold_data = None
     _dataset_dir = None
 
     def setup_dataframe(self, dataset_dir):
@@ -38,7 +40,7 @@ class ManifestDataFrame(metaclass=Singleton):
 
     def _read_manifests(self, depth=0):
         """
-        Read the manifest files in the dataset directory.
+        Recursively read the manifest files in the dataset directory.
 
         Args:
             depth (int): The current depth of recursive manifest reading.
@@ -64,7 +66,7 @@ class ManifestDataFrame(metaclass=Singleton):
         if sanitised and depth == 0:
             self._read_manifests(depth + 1)
         elif sanitised and depth > 0:
-            raise BadManifestError('Manifest sanitisation error found.')
+            raise BadManifestError('Manifest sanitization error found.')
 
     def create_manifest(self, manifest_dir):
         """
@@ -108,7 +110,7 @@ class ManifestDataFrame(metaclass=Singleton):
         Sanitize the column names related to 'derived from'.
 
         Args:
-            column_names.
+            column_names (list): List of column names.
         """
         sanitised = False
         bad_column_name = ''
@@ -116,7 +118,6 @@ class ManifestDataFrame(metaclass=Singleton):
             if column_name.lower() == DERIVED_FROM_COLUMN.lower():
                 if column_name != DERIVED_FROM_COLUMN:
                     bad_column_name = column_name
-
                 break
 
         if bad_column_name:
@@ -203,7 +204,6 @@ class ManifestDataFrame(metaclass=Singleton):
 
         # If fileDF is empty, means there's no manifest file containing this file's annotation.
         if fileDF.empty:
-            print("manifest_dir", manifest_dir)
             newRow = pd.DataFrame({FILENAME_COLUMN: file_name}, index=[1])
             # Check if there's manifest file under same Scaffold File Dir. If yes get data from it.
             # If no manifest file create new manifest file. Add file to the manifest.
@@ -242,15 +242,34 @@ class ManifestDataFrame(metaclass=Singleton):
         self.update_column_content(file_location, SUPPLEMENTAL_JSON_COLUMN, annotation_data)
 
     def update_anatomical_entity(self, file_location, annotation_data):
+        """
+        Update the anatomical entity information in the manifest for a given file.
+
+        Args:
+            file_location (str): The file location.
+            annotation_data (str): The anatomical entity annotation data.
+        """
         self.update_column_content(file_location, ANATOMICAL_ENTITY_COLUMN, annotation_data)
 
     def update_column_content(self, file_location, column_name, content, append=False):
+        """
+        Update the content of a specified column for a given file location.
+
+        Args:
+            file_location (str): The file location.
+            column_name (str): The name of the column to update.
+            content (str): The content to update in the column.
+            append (bool): Whether to append the content if the column already contains data.
+
+        Raises:
+            FileNotFoundError: If the file is not found in the manifest.
+        """
         # Update the cells with row: file_location, column: column_name to content
         fileDF = self.get_file_dataframe(file_location)
         for index, row in fileDF.iterrows():
             mDF = pd.read_excel(os.path.join(row[MANIFEST_DIR_COLUMN], MANIFEST_FILENAME),
                                 sheet_name=row[SHEET_NAME_COLUMN])
-            if os.path.isabs(content):
+            if content and os.path.isabs(content):
                 content = os.path.relpath(content, row[MANIFEST_DIR_COLUMN])
             if column_name not in mDF.columns:
                 mDF[column_name] = ""

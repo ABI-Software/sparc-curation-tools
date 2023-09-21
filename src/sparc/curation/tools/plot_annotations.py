@@ -50,12 +50,42 @@ def get_all_plots_path():
     return OnDiskFiles().get_plot_files()
 
 
-def get_all_thumbnail_path():
-    return OnDiskFiles().get_thumbnail_files()
+def get_plot_thumbnails():
+    return OnDiskFiles().get_plot_thumbnails()
 
 
-def get_manifest():
-    return ManifestDataFrame()
+def get_annotated_plot_dictionary():
+    """
+    Build and return a plot dictionary based on plot annotation in manifest files.
+    The annotated plot dictionary has the following structure:
+    {
+        plot_file: [thumbnail_files]
+    }
+
+    Returns:
+        dict: Plot dictionary.
+    """
+    manifest = ManifestDataFrame()
+    annotated_plot_dictionary = {}
+
+    # Get a list of plot files in the manifest
+    plot_files = manifest.scaffold_get_plot_files()
+
+    for plot_file in plot_files:
+        # Get the directory where the metadata file is located
+        manifest_dir = manifest.get_manifest_directory(plot_file)[0]
+
+        # Get a list of thumbnail filenames associated with the plot_file
+        thumbnail_filenames = manifest.get_source_of(plot_file)
+
+        # Create a list to store thumbnail information for this view
+        plot_entry = [os.path.join(manifest_dir, thumbnail) for thumbnail in thumbnail_filenames
+                      if not isinstance(thumbnail, float)]
+
+        # Add the metadata entry to the annotated scaffold dictionary
+        annotated_plot_dictionary[plot_file] = plot_entry
+
+    return annotated_plot_dictionary
 
 
 def get_plot_annotation_data(plot_file):
@@ -83,10 +113,6 @@ def get_plot_annotation_data(plot_file):
         'attrs': attrs
     }
     return json.dumps(data)
-
-
-def get_path_by_name(file_name):
-    return ManifestDataFrame().get_filepath_on_disk(file_name)
 
 
 def get_confirmation_message(error=None):
@@ -132,8 +158,9 @@ def main():
 
     args = parser.parse_args()
     dataset_dir = args.dataset_dir
-
-    data = get_plot_annotation_data(args)
+    max_size = convert_to_bytes('3000MiB')
+    OnDiskFiles().setup_dataset(dataset_dir, max_size)
+    ManifestDataFrame().setup_dataframe(dataset_dir)
     annotate_plot_from_plot_paths(get_all_plots_path())
 
 

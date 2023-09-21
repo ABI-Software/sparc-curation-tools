@@ -5,19 +5,18 @@ from pathlib import Path
 
 from sparc.curation.tools.helpers.base import Singleton
 
-
 ZINC_GRAPHICS_TYPES = ["points", "lines", "surfaces", "contours", "streamlines"]
 
 
-def _is_graphics_entry(entry):
+def is_graphics_entry(entry):
     """
-    Check if the given entry is a graphics entry.
+    Check if the given entry in JSON format represents a graphics entry.
 
     Args:
-        entry (dict): The entry to check.
+        entry (dict): The JSON entry to check.
 
     Returns:
-        bool: True if it is a graphics entry, False otherwise.
+        bool: True if it's a graphics entry, False otherwise.
     """
     if 'URL' in entry and 'Type' in entry:
         entry_type = entry['Type']
@@ -27,15 +26,15 @@ def _is_graphics_entry(entry):
     return False
 
 
-def _is_view_entry(entry):
+def is_view_entry(entry):
     """
-    Check if the given entry is a view entry.
+    Check if the given entry in JSON format represents a view entry.
 
     Args:
-        entry (dict): The entry to check.
+        entry (dict): The JSON entry to check.
 
     Returns:
-        bool: True if it is a view entry, False otherwise.
+        bool: True if it's a view entry, False otherwise.
     """
     if 'URL' in entry and 'Type' in entry:
         entry_type = entry['Type']
@@ -45,9 +44,9 @@ def _is_view_entry(entry):
     return False
 
 
-def test_for_metadata(json_data):
+def contains_metadata(json_data):
     """
-    Test if the given JSON data contains metadata.
+    Check if the given JSON data contains metadata entries.
 
     Args:
         json_data (str): The JSON data to test.
@@ -57,20 +56,21 @@ def test_for_metadata(json_data):
     """
     have_viewable_graphics = False
     have_view_reference = False
+
     if json_data:
         if isinstance(json_data, list):
             for entry in json_data:
-                if not have_viewable_graphics and _is_graphics_entry(entry):
+                if not have_viewable_graphics and is_graphics_entry(entry):
                     have_viewable_graphics = True
-                if not have_view_reference and _is_view_entry(entry):
+                if not have_view_reference and is_view_entry(entry):
                     have_view_reference = True
 
     return have_view_reference and have_viewable_graphics
 
 
-def test_for_view(json_data):
+def represents_view(json_data):
     """
-    Test if the given JSON data represents a view.
+    Check if the given JSON data represents a view.
 
     Args:
         json_data (str): The JSON data to test.
@@ -79,10 +79,12 @@ def test_for_view(json_data):
         bool: True if it represents a view, False otherwise.
     """
     is_view = False
+
     if json_data:
         if isinstance(json_data, dict):
             expected_keys = ["farPlane", "nearPlane", "upVector", "targetPosition", "eyePosition"]
             missing_key = False
+
             for expected_key in expected_keys:
                 if expected_key not in json_data:
                     missing_key = True
@@ -104,7 +106,6 @@ def is_context_data_file(json_data):
     """
     if json_data:
         if isinstance(json_data, dict):
-            # "version" and "id" are required keys for a context data file.
             if "version" in json_data and "id" in json_data:
                 return json_data["id"] == "sparc.science.context_data"
 
@@ -123,6 +124,7 @@ def is_annotation_csv_file(csv_reader):
     """
     if csv_reader:
         first = True
+
         for row in csv_reader:
             if first:
                 if len(row) == 2 and row[0] == "Term ID" and row[1] == "Group name":
@@ -150,6 +152,7 @@ def is_json_of_type(file_path, max_size, test_func):
         bool: True if it is a JSON file of the specified type, False otherwise.
     """
     result = False
+
     if os.path.getsize(file_path) < max_size and os.path.isfile(file_path):
         try:
             with open(file_path, encoding='utf-8') as f:
@@ -181,6 +184,7 @@ def is_csv_of_type(file_path, max_size, test_func):
         bool: True if it is a CSV file of the specified type, False otherwise.
     """
     result = False
+
     if os.path.getsize(file_path) < max_size and os.path.isfile(file_path):
         try:
             with open(file_path, encoding='utf-8') as f:
@@ -207,10 +211,13 @@ def get_view_urls(metadata_file):
         list: A list of view URLs.
     """
     view_urls = []
+
     try:
         with open(metadata_file, encoding='utf-8') as f:
             file_data = f.read()
+
         json_data = json.loads(file_data)
+
         if json_data:
             if isinstance(json_data, list):
                 for entry in json_data:
@@ -240,8 +247,9 @@ def search_for_metadata_files(dataset_dir, max_size):
     metadata = []
     metadata_views = {}
     result = list(Path(dataset_dir).rglob("*"))
+
     for r in result:
-        meta = is_json_of_type(r, max_size, test_for_metadata)
+        meta = is_json_of_type(r, max_size, contains_metadata)
 
         if meta:
             metadata.append(str(r))
@@ -251,33 +259,45 @@ def search_for_metadata_files(dataset_dir, max_size):
     return metadata, metadata_views
 
 
-def search_for_thumbnail_files(dataset_dir, view_files):
+def search_for_image_files(dataset_dir):
     """
     Search for thumbnail files in the dataset directory that correspond to the given view files.
 
     Args:
         dataset_dir (str): The dataset directory path.
-        view_files (list): A list of view file paths.
 
     Returns:
         list: A list of thumbnail file paths.
     """
-    potential_thumbnails = list(Path(dataset_dir).rglob("*thumbnail*"))
-    potential_thumbnails += list(Path(dataset_dir).rglob("*.png"))
-    potential_thumbnails += list(Path(dataset_dir).rglob("*.jpeg"))
-    potential_thumbnails += list(Path(dataset_dir).rglob("*.jpg"))
-    potential_thumbnails = list(set(potential_thumbnails))
+    image_file_paths = list(Path(dataset_dir).rglob("*.png"))
+    image_file_paths += list(Path(dataset_dir).rglob("*.jpeg"))
+    image_file_paths += list(Path(dataset_dir).rglob("*.jpg"))
+    image_file_paths = list(set(image_file_paths))
 
-    result = []
-    for view_file in view_files:
-        view_dir = os.path.dirname(view_file)
-        result.extend([image_file for image_file in potential_thumbnails if view_dir == os.path.dirname(image_file)])
+    return image_file_paths
 
-    result = list(set(result))
-    # For each result:
-    #   - Is this file actually an image?
-    # Probably just leave this for now and go with the simple name comparison.
-    return [str(x) for x in result]
+
+def filter_thumbnail_files_by_parent(image_file_paths, parent_files):
+    """
+    Filter a list of image file paths to include only those whose in the same folder
+    of any parent file in the given parent_files.
+
+    Args:
+        image_file_paths (list): List of image file paths.
+        parent_files (list): List of parent files paths.
+
+    Returns:
+        list: Filtered list of image file paths.
+    """
+    filtered_files = []
+
+    for parent_file in parent_files:
+        parent_dir = os.path.dirname(parent_file)
+        filtered_files.extend(
+            [image_file for image_file in image_file_paths if os.path.dirname(image_file) == parent_dir]
+        )
+
+    return list(set(filtered_files))
 
 
 def search_for_view_files(dataset_dir, max_size):
@@ -292,10 +312,10 @@ def search_for_view_files(dataset_dir, max_size):
         list: A list of view file paths.
     """
     metadata = []
-    result = list(Path(dataset_dir).rglob("*"))
-    for r in result:
-        meta = is_json_of_type(r, max_size, test_for_view)
+    result = list(Path(dataset_dir).rglob("*.json"))
 
+    for r in result:
+        meta = is_json_of_type(r, max_size, represents_view)
         if meta:
             metadata.append(str(r))
 
@@ -310,22 +330,22 @@ def search_for_plot_files(dataset_dir):
         dataset_dir (str): The dataset directory path.
 
     Returns:
-        dict: A dictionary containing lists of CSV and TSV plot file paths.
+        list: A list containing CSV and TSV plot file paths.
     """
     plot_files = []
-    for root, dirs, files in os.walk(dataset_dir):
-        # TODO: Check if it's plot file
-        for filename in files:
-            if filename.endswith(".csv"):
-                csv_file = os.path.join(root, filename)
-                plot_files.append(csv_file)
-            elif filename.endswith(".tsv"):
-                tsv_file = os.path.join(root, filename)
-                plot_files.append(tsv_file)
-            elif filename.endswith(".txt"):
-                txt_file = os.path.join(root, filename)
-                csv_location = create_csv_from_txt(txt_file)
-                plot_files.append(csv_location)
+    csv_files = list(Path(dataset_dir).rglob("*csv"))
+    plot_files += csv_files
+
+    tsv_files = list(Path(dataset_dir).rglob("*tsv"))
+    plot_files += tsv_files
+
+    txt_files = list(Path(dataset_dir).rglob("*txt"))
+
+    for r in txt_files:
+        csv_location = create_csv_from_txt(r)
+        if csv_location:
+            plot_files.append(csv_location)
+
     return plot_files
 
 
@@ -343,6 +363,7 @@ def create_csv_from_txt(file_path):
     start = False
     finish = False
     csv_rows = []
+
     for line in data:
         if "+Fin" in line:
             finish = True
@@ -351,6 +372,7 @@ def create_csv_from_txt(file_path):
             if line_data_list[1].startswith("D"):
                 clean_data = line_data_list[1][1:].split(",")
                 line_data_list.pop()
+
                 if line_data_list[0].endswith("s"):
                     line_data_list[0] = line_data_list[0][:-1]
                 line_data_list += clean_data
@@ -358,14 +380,17 @@ def create_csv_from_txt(file_path):
         else:
             if "EIT STARTING" in line:
                 start = True
-    file_path = os.path.splitext(file_path)[0]
-    csv_file_name = f"{file_path}.csv"
-    with open(csv_file_name, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(['Time', 'V'])
-        writer.writerows(csv_rows)
 
-    return csv_file_name
+    if csv_rows:
+        file_path = os.path.splitext(file_path)[0]
+        csv_file_name = f"{file_path}.csv"
+
+        with open(csv_file_name, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow(['Time', 'V'])
+            writer.writerows(csv_rows)
+
+        return csv_file_name
 
 
 class OnDiskFiles(metaclass=Singleton):
@@ -388,10 +413,16 @@ class OnDiskFiles(metaclass=Singleton):
         set_thumbnail_files(files): Set the thumbnail files.
         get_thumbnail_files(): Get the thumbnail file paths.
         get_plot_files(): Get the plot file paths.
+        get_plot_thumbnails(): Get the plot thumbnail paths.
+        get_all_image_files(): Get all the image file paths in the dataset.
     """
 
     _dataset_dir = None
-    _plot_files = []
+    _image_paths = []
+    _plot_files = {
+        'plot': [],
+        'thumbnail': [],
+    }
     _scaffold_files = {
         'metadata': [],
         'view': [],
@@ -410,12 +441,18 @@ class OnDiskFiles(metaclass=Singleton):
             OnDiskFiles: The instance of the class.
         """
         self._dataset_dir = dataset_dir
-        scaffold_files_dir = os.path.join(self._dataset_dir, "derivative")
-        metadata_file, metadata_views = search_for_metadata_files(scaffold_files_dir, max_size)
+        self._image_paths = search_for_image_files(dataset_dir)
+
+        metadata_file, metadata_views = search_for_metadata_files(dataset_dir, max_size)
         self.set_metadata_files(metadata_file, metadata_views)
-        self.set_view_files(search_for_view_files(scaffold_files_dir, max_size))
-        self.set_thumbnail_files(search_for_thumbnail_files(scaffold_files_dir, self.get_view_files()))
-        self._plot_files = search_for_plot_files(self._dataset_dir)
+
+        self._scaffold_files['view'] = search_for_view_files(dataset_dir, max_size)
+        self._scaffold_files['thumbnail'] = filter_thumbnail_files_by_parent(self._image_paths,
+                                                                             self._scaffold_files['view'])
+
+        self._plot_files["plot"] = search_for_plot_files(self._dataset_dir)
+        self._plot_files["thumbnail"] = filter_thumbnail_files_by_parent(self._image_paths,
+                                                                         self._plot_files['plot'])
         return self
 
     def get_dataset_dir(self):
@@ -438,16 +475,7 @@ class OnDiskFiles(metaclass=Singleton):
         Returns:
             list: List of metadata file paths.
         """
-        return self._scaffold_files['metadata']
-
-    def set_view_files(self, files):
-        """
-        Set the view files.
-
-        Args:
-            files (list): List of view file paths.
-        """
-        self._scaffold_files['view'] = files
+        return [str(i) for i in self._scaffold_files['metadata']]
 
     def get_view_files(self):
         """
@@ -456,16 +484,7 @@ class OnDiskFiles(metaclass=Singleton):
         Returns:
             list: List of view file paths.
         """
-        return self._scaffold_files['view']
-
-    def set_thumbnail_files(self, files):
-        """
-        Set the thumbnail files.
-
-        Args:
-            files (list): List of thumbnail file paths.
-        """
-        self._scaffold_files['thumbnail'] = files
+        return [str(i) for i in self._scaffold_files['view']]
 
     def get_thumbnail_files(self):
         """
@@ -474,7 +493,7 @@ class OnDiskFiles(metaclass=Singleton):
         Returns:
             list: List of thumbnail file paths.
         """
-        return self._scaffold_files['thumbnail']
+        return [str(i) for i in self._scaffold_files['thumbnail']]
 
     def get_plot_files(self):
         """
@@ -483,4 +502,22 @@ class OnDiskFiles(metaclass=Singleton):
         Returns:
             list: Lists of CSV and TSV plot file paths.
         """
-        return self._plot_files[:]
+        return [str(i) for i in self._plot_files['plot']]
+
+    def get_plot_thumbnails(self):
+        """
+        Get the plot thumbnail paths.
+
+        Returns:
+            list: Lists of plot thumbnail paths.
+        """
+        return [str(i) for i in self._plot_files['thumbnail']]
+
+    def get_all_image_files(self):
+        """
+        Get all the image file paths.
+
+        Returns:
+            list: List of all image file paths.
+        """
+        return [str(i) for i in self._image_paths]
