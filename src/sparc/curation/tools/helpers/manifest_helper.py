@@ -149,20 +149,43 @@ class ManifestDataFrame(metaclass=Singleton):
         return self._manifestDataFrame[same_file]
 
     def get_matching_entry(self, column_heading, value, out_column_heading=FILENAME_COLUMN):
-        matching_files = []
-        for index, row in self._manifestDataFrame.iterrows():
-            if column_heading in row and row[column_heading] == value and out_column_heading in row:
-                matching_files.append(row[out_column_heading])
+        """
+        Get a list of entries from the specified column based on a matching condition.
 
+        Args:
+            column_heading (str): The column to filter based on the 'value'.
+            value: The value to match in the specified 'column_heading'.
+            out_column_heading (str): The column from which to retrieve matching entries.
+
+        Returns:
+            list: A list of matching entries from the 'out_column_heading' column.
+        """
+        matching_files = []
+
+        # Check if the specified columns exist in the manifest DataFrame
+        if column_heading in self._manifestDataFrame.columns and out_column_heading in self._manifestDataFrame.columns:
+            condition = self._manifestDataFrame[column_heading] == value
+            matching_files = list(self._manifestDataFrame[out_column_heading][condition])
         return matching_files
 
     def get_entry_that_includes(self, column_heading, value, out_column_heading=FILENAME_COLUMN):
-        matching_files = []
-        for index, row in self._manifestDataFrame.iterrows():
-            if column_heading in row and isinstance(row[column_heading], str):
-                if value in row[column_heading].split("\n") and out_column_heading in row:
-                    matching_files.append(row[out_column_heading])
+        """
+        Get a list of entries from the specified column based on partial matching condition.
 
+        Args:
+            column_heading (str): The column to search for partial matches.
+            value (str): The value to search for within the specified 'column_heading'.
+            out_column_heading (str): The column from which to retrieve matching entries.
+
+        Returns:
+            list: A list of matching entries from the 'out_column_heading' column.
+        """
+        matching_files = []
+
+        # Check if the specified columns exist in the manifest DataFrame
+        if column_heading in self._manifestDataFrame.columns and out_column_heading in self._manifestDataFrame.columns:
+            condition = self._manifestDataFrame[column_heading].str.contains(value, na=False, regex=False)
+            matching_files = list(self._manifestDataFrame[out_column_heading][condition])
         return matching_files
 
     def get_filepath_on_disk(self, file_location):
