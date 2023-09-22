@@ -3,6 +3,7 @@ import re
 import argparse
 import json
 
+from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN
 from sparc.curation.tools.helpers.manifest_helper import ManifestDataFrame
 from sparc.curation.tools.helpers.file_helper import OnDiskFiles
 from sparc.curation.tools.utilities import convert_to_bytes
@@ -52,6 +53,14 @@ def get_all_plots_path():
 
 def get_plot_thumbnails():
     return OnDiskFiles().get_plot_thumbnails()
+
+
+def get_filename_by_location(object_text):
+    ManifestDataFrame().get_matching_entry(FILE_LOCATION_COLUMN, object_text)
+
+
+def update_column_content(subject_text, predicate_text, object_value, append):
+    ManifestDataFrame().update_column_content(subject_text, predicate_text, object_value, append)
 
 
 def get_annotated_plot_dictionary():

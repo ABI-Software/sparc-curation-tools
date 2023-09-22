@@ -1,6 +1,7 @@
 import argparse
 import os
 
+from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN
 from sparc.curation.tools.helpers.error_helper import ErrorManager
 from sparc.curation.tools.helpers.file_helper import OnDiskFiles
 from sparc.curation.tools.helpers.manifest_helper import ManifestDataFrame
@@ -36,6 +37,14 @@ def get_on_disk_thumbnail_files():
 
 
 # Manifest section
+def get_filename_by_location(object_text):
+    ManifestDataFrame().get_matching_entry(FILE_LOCATION_COLUMN, object_text)
+
+
+def update_column_content(subject_text, predicate_text, object_value, append):
+    ManifestDataFrame().update_column_content(subject_text, predicate_text, object_value, append)
+
+
 def get_annotated_scaffold_dictionary():
     """
     Build and return a scaffold dictionary based on scaffold annotation in manifest files.
