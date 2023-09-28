@@ -39,12 +39,15 @@ def flatten_nested_list(nested_list):
 
 
 def annotate_plot_from_plot_paths(plot_paths):
-    plot_list = plot_utilities.create_plots_list_from_plot_paths(plot_paths)
-    plot_utilities.generate_plot_thumbnail(plot_list)
+    for plot_path in plot_paths:
+        annotate_one_plot(plot_path)
 
-    for plot_file in plot_list:
-        data = get_plot_annotation_data(plot_file)
-        ManifestDataFrame().update_plot_annotation(plot_file.location, data, plot_file.thumbnail)
+
+def annotate_one_plot(plot_path):
+    plot = plot_utilities.create_plot_from_plot_path(plot_path)
+    plot_utilities.generate_plot_thumbnail(plot)
+    data = get_plot_annotation_data(plot)
+    ManifestDataFrame().update_plot_annotation(plot.location, data, plot.thumbnail)
 
 
 def get_all_plots_path():

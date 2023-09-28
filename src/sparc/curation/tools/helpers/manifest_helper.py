@@ -253,7 +253,6 @@ class ManifestDataFrame(metaclass=Singleton):
 
         # Annotate thumbnail file
         if thumbnail_location:
-            self.get_file_dataframe(thumbnail_location)
             self.update_additional_type(thumbnail_location, SCAFFOLD_THUMBNAIL_MIME)
             self.update_column_content(thumbnail_location, DERIVED_FROM_COLUMN, file_location)
             self.update_column_content(file_location, SOURCE_OF_COLUMN, thumbnail_location)

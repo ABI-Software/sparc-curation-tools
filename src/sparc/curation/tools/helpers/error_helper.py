@@ -36,6 +36,7 @@ class ErrorManager(metaclass=Singleton):
         self.on_disk_metadata_files = self.on_disk.get_metadata_files()
         self.on_disk_view_files = self.on_disk.get_view_files()
         self.on_disk_thumbnail_files = self.on_disk.get_thumbnail_files()
+        self.on_disk_plot_thumbnail_files = self.on_disk.get_plot_thumbnails()
 
         self.manifest_metadata_files = self.manifest.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_META_MIME,
                                                                         FILE_LOCATION_COLUMN)
@@ -108,7 +109,7 @@ class ErrorManager(metaclass=Singleton):
                 errors.append(IncorrectAnnotationError(i, SCAFFOLD_VIEW_MIME))
 
         for i in self.manifest_thumbnail_files:
-            if i not in self.on_disk_thumbnail_files:
+            if i not in self.on_disk_thumbnail_files and i not in self.on_disk_plot_thumbnail_files:
                 errors.append(IncorrectAnnotationError(i, SCAFFOLD_THUMBNAIL_MIME))
 
         return errors
