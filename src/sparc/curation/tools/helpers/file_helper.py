@@ -340,57 +340,11 @@ def search_for_plot_files(dataset_dir):
     plot_files += tsv_files
 
     txt_files = list(Path(dataset_dir).rglob("*txt"))
-
-    for r in txt_files:
-        csv_location = create_csv_from_txt(r)
-        if csv_location:
-            plot_files.append(csv_location)
+    plot_files += txt_files
 
     return plot_files
 
 
-def create_csv_from_txt(file_path):
-    """
-    Create a CSV file from a text file.
-
-    Args:
-        file_path (str): The path to the text file.
-
-    Returns:
-        str: The path to the created CSV file.
-    """
-    data = open(file_path)
-    start = False
-    finish = False
-    csv_rows = []
-
-    for line in data:
-        if "+Fin" in line:
-            finish = True
-        elif start and not finish:
-            line_data_list = line.split()
-            if line_data_list[1].startswith("D"):
-                clean_data = line_data_list[1][1:].split(",")
-                line_data_list.pop()
-
-                if line_data_list[0].endswith("s"):
-                    line_data_list[0] = line_data_list[0][:-1]
-                line_data_list += clean_data
-                csv_rows.append(line_data_list)
-        else:
-            if "EIT STARTING" in line:
-                start = True
-
-    if csv_rows:
-        file_path = os.path.splitext(file_path)[0]
-        csv_file_name = f"{file_path}.csv"
-
-        with open(csv_file_name, mode='w', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow(['Time', 'V'])
-            writer.writerows(csv_rows)
-
-        return csv_file_name
 
 
 class OnDiskFiles(metaclass=Singleton):
