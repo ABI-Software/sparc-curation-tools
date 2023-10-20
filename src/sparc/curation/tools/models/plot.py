@@ -25,10 +25,18 @@ class Plot(object):
         return self.plot_df.columns[self.x_axis_column]
 
     def set_y_columns(self, y_columns):
-        max_index = len(self.plot_df.columns) - 1
+        if self.plot_type == "timeseries":
+            max_index = len(self.plot_df.columns) - 1
+        else:
+            max_index = len(self.plot_df.iloc[:, 0]) - 1
         self.y_axes_columns = [index for index in y_columns if 0 <= index <= max_index]
 
     def get_y_columns_name(self):
-        if self.y_axes_columns:
-            return self.plot_df.columns[self.y_axes_columns]
-        return self.plot_df.columns[self.x_axis_column + 1:]
+        if self.plot_type == "timeseries":
+            if self.y_axes_columns:
+                return self.plot_df.columns[self.y_axes_columns]
+            return self.plot_df.columns[self.x_axis_column + 1:]
+        else:
+            if self.y_axes_columns:
+                return self.plot_df.iloc[self.y_axes_columns, 0]
+            return self.plot_df.iloc[:, 0]

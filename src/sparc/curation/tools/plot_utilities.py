@@ -102,7 +102,7 @@ def is_unique_increasing(series):
         series = series.astype(float)
     except ValueError:
         return False
-    return series.astype(float).is_monotonic_increasing and series.is_unique
+    return series.is_monotonic_increasing and series.is_unique
 
 
 def is_valid_plot(df):
@@ -121,7 +121,7 @@ def create_thumbnail_from_plot(plot):
     if plot.plot_type == "timeseries":
         fig = px.scatter(plot.plot_df, x=plot.get_x_column_name(), y=plot.get_y_columns_name())
     elif plot.plot_type == "heatmap":
-        fig = px.imshow(plot.plot_df)
+        fig = px.imshow(plot.plot_df, y=plot.get_y_columns_name(), aspect="auto")
 
     if fig:
         fig_path = os.path.splitext(plot.location)[0]
