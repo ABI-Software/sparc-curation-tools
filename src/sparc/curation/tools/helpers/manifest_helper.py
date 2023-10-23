@@ -247,7 +247,7 @@ class ManifestDataFrame(metaclass=Singleton):
     def update_plot_annotation(self, file_location, supplemental_json_data, thumbnail_location):
         if file_location.endswith(".csv"):
             self.update_additional_type(file_location, PLOT_CSV_MIME)
-        elif file_location.endswith(".tsv"):
+        elif file_location.endswith(".tsv") or file_location.endswith(".txt"):
             self.update_additional_type(file_location, PLOT_TSV_MIME)
         self.update_supplemental_json(file_location, supplemental_json_data)
 
