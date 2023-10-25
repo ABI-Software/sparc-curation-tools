@@ -1,11 +1,16 @@
+import json
+import os
 import unittest
 
 import pandas as pd
 
+from sparc.curation.tools.helpers.file_helper import OnDiskFiles
+from sparc.curation.tools.helpers.manifest_helper import ManifestDataFrame
 from sparc.curation.tools.models.plot import Plot
-from sparc.curation.tools.plot_annotations import *
+from sparc.curation.tools.plot_annotations import get_all_plots_path, annotate_plot_from_plot_paths, get_plot_annotation_data, get_confirmation_message
 
-from gitresources import dulwich_checkout, setup_resources, dulwich_proper_stash_and_drop
+from gitresources import dulwich_checkout, dulwich_clean, dulwich_proper_stash_and_drop, setup_resources
+from sparc.curation.tools.utilities import convert_to_bytes
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -40,13 +45,14 @@ class TestPlotAnnotations(unittest.TestCase):
         manifest_data = pd.read_excel(manifest_file)
         expected_data = pd.read_excel(expected_file)
 
-        self.assertFalse(manifest_data.equals(expected_data))
+        self.assertFalse(expected_data.equals(manifest_data))
 
         plot_paths = get_all_plots_path()
         annotate_plot_from_plot_paths(plot_paths)
         manifest_data = pd.read_excel(manifest_file)
 
-        self.assertTrue(manifest_data.equals(expected_data))
+        dulwich_clean(self._repo, self._repo.path)
+        self.assertTrue(expected_data.equals(manifest_data))
 
     def test_get_all_plots_path(self):
         dulwich_checkout(self._repo, b"origin/test_annotate_plot")
@@ -76,7 +82,7 @@ class TestPlotAnnotations(unittest.TestCase):
             }
         }
 
-        self.assertEqual(json.loads(data), expected_data)
+        self.assertEqual(expected_data, json.loads(data))
 
     def test_get_confirmation_message(self):
         confirmation_message = get_confirmation_message(error=None)
