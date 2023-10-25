@@ -22,7 +22,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 
 
 def setup_resources():
-    url = "https://github.com/hsorby/sparc-dataset-curation-test-resources.git"
+    url = "https://github.com/ABI-Software/sparc-dataset-curation-test-resources.git"
     environment_location = os.environ.get("SPARC_DATASET_CURATION_TEST_RESOURCES", "<not-set>")
     default_resources_path = os.path.join(here, "resources")
     readme_file = os.path.join(default_resources_path, "README.rst")
