@@ -184,7 +184,7 @@ class ErrorManager(metaclass=Singleton):
             if i in on_disk_files:
                 manifest_source_of = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, i, SOURCE_OF_COLUMN)
 
-                if pd.isna(manifest_source_of) or len(manifest_source_of) == 0:
+                if pd.isna(manifest_source_of).any() or len(manifest_source_of) == 0:
                     errors.append(IncorrectSourceOfError(i, incorrect_mime, on_disk_child_files))
                 else:
                     source_of_files_list = []
@@ -231,7 +231,7 @@ class ErrorManager(metaclass=Singleton):
         for i in self.manifest_view_files:
             manifest_source_of = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, i, SOURCE_OF_COLUMN)
 
-            if pd.isna(manifest_source_of) or len(manifest_source_of) == 0:
+            if pd.isna(manifest_source_of).any() or len(manifest_source_of) == 0:
                 match_rating = [calculate_match(tt, i) for tt in self.on_disk_thumbnail_files]
                 max_value = max(match_rating)
                 max_index = match_rating.index(max_value)
