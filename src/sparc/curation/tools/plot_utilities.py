@@ -30,27 +30,27 @@ def generate_dataframe_from_txt(file_path):
     Returns:
         dataframe: The dataframe generated from the txt file.
     """
-    data = open(file_path)
     start = False
     finish = False
     csv_rows = []
 
-    for line in data:
-        if "+Fin" in line:
-            finish = True
-        elif start and not finish:
-            line_data_list = line.split()
-            if line_data_list[1].startswith("D"):
-                clean_data = line_data_list[1][1:].split(",")
-                line_data_list.pop()
+    with open(file_path) as f:
+        for line in f:
+            if "+Fin" in line:
+                finish = True
+            elif start and not finish:
+                line_data_list = line.split()
+                if line_data_list[1].startswith("D"):
+                    clean_data = line_data_list[1][1:].split(",")
+                    line_data_list.pop()
 
-                if line_data_list[0].endswith("s"):
-                    line_data_list[0] = line_data_list[0][:-1]
-                line_data_list += clean_data
-                csv_rows.append(line_data_list)
-        else:
-            if "EIT STARTING" in line:
-                start = True
+                    if line_data_list[0].endswith("s"):
+                        line_data_list[0] = line_data_list[0][:-1]
+                    line_data_list += clean_data
+                    csv_rows.append(line_data_list)
+            else:
+                if "EIT STARTING" in line:
+                    start = True
 
     if csv_rows:
         df = pd.DataFrame(csv_rows)
