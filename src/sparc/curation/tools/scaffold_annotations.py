@@ -74,10 +74,9 @@ def get_annotated_scaffold_dictionary():
         metadata_entry = {}
 
         # View filenames can have multiple lines separated by a newline.
-        if not isinstance(view_filenames[0], float):
-            view_filenames = list(filter(None, view_filenames[0].split('\n')))
-        else:
-            view_filenames = []
+        if isinstance(view_filenames, list) and len(view_filenames):
+            if not isinstance(view_filenames[0], float):
+                view_filenames = list(filter(None, view_filenames[0].split('\n')))
 
         for view in view_filenames:
             view_filename = os.path.join(manifest_dir, view)
