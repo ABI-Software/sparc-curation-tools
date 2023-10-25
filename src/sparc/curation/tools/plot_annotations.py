@@ -152,10 +152,9 @@ def get_confirmation_message(error=None):
     "To fix this error, the data of filename in manifestFile will be deleted."
     """
     if error is None:
-        return "Let this magic tool annotation plots for you?"
+        return "Let this magic tool annotate all plots for you?"
 
-    message = "Let this magic tool annotation this plot for you?"
-    return message
+    return "Let this magic tool annotate this plot for you?"
 
 
 def main():

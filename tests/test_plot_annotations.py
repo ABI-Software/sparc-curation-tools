@@ -86,10 +86,10 @@ class TestPlotAnnotations(unittest.TestCase):
 
     def test_get_confirmation_message(self):
         confirmation_message = get_confirmation_message(error=None)
-        self.assertEqual(confirmation_message, "Let this magic tool annotation plots for you?")
+        self.assertEqual(confirmation_message, "Let this magic tool annotate all plots for you?")
 
         error_message = get_confirmation_message(error="Some error")
-        self.assertEqual(error_message, "Let this magic tool annotation this plot for you?")
+        self.assertEqual(error_message, "Let this magic tool annotate this plot for you?")
 
 
 if __name__ == '__main__':

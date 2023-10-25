@@ -187,8 +187,7 @@ def get_confirmation_message(error=None):
     if error is None:
         return "Let this magic tool fix all errors for you?"
 
-    message = "Let this magic tool fix this error for you?"
-    return message
+    return "Let this magic tool fix this error for you?"
 
 
 def fix_error(error):
