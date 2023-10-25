@@ -41,7 +41,8 @@ def flatten_nested_list(nested_list):
 def annotate_plot_from_plot_paths(plot_paths):
     for plot_path in plot_paths:
         plot = plot_utilities.create_plot_from_plot_path(plot_path)
-        annotate_one_plot(plot)
+        if plot:
+            annotate_one_plot(plot)
 
 
 def annotate_one_plot(plot):
