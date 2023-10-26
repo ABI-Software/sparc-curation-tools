@@ -53,8 +53,6 @@ class TestPlotAnnotations(unittest.TestCase):
         manifest_data = pd.read_excel(manifest_file)
 
         dulwich_clean(self._repo, self._repo.path)
-        print('------------------------')
-        print(expected_data.compare(manifest_data))
         self.assertTrue(expected_data.equals(manifest_data))
 
     def test_get_all_plots_path(self):
