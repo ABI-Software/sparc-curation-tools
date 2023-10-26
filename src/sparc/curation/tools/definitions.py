@@ -6,7 +6,7 @@ SCAFFOLD_VIEW_MIME = 'application/x.vnd.abi.scaffold.view+json'
 SCAFFOLD_THUMBNAIL_MIME = 'image/x.vnd.abi.thumbnail+jpeg'
 CONTEXT_INFO_MIME = 'application/x.vnd.abi.context-information+json'
 PLOT_CSV_MIME = 'text/x.vnd.abi.plot+csv'
-PLOT_TSV_MIME = 'text/vnd.abi.plot+Tab-separated-values'
+PLOT_TSV_MIME = 'text/x.vnd.abi.plot+Tab-separated-values'
 
 OLD_SCAFFOLD_MIMES = [SCAFFOLD_DIR_MIME, 'inode/vnd.abi.scaffold+file', 'inode/vnd.abi.scaffold+thumbnail']
 
