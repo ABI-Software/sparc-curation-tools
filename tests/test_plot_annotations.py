@@ -70,7 +70,7 @@ class TestPlotAnnotations(unittest.TestCase):
 
     def test_get_plot_annotation_data(self):
 
-        plot_file = Plot("plot.png", "heatmap")
+        plot_file = Plot("plot.png", [], plot_type="heatmap", no_header=False)
 
         data = get_plot_annotation_data(plot_file)
 
