@@ -51,8 +51,10 @@ class TestPlotAnnotations(unittest.TestCase):
         annotate_plot_from_plot_paths(plot_paths)
         manifest_data = pd.read_excel(manifest_file)
 
-        self.assertTrue(expected_data.equals(manifest_data))
         dulwich_clean(self._repo, self._repo.path)
+        print('------------------------')
+        print(expected_data.compare(manifest_data))
+        self.assertTrue(expected_data.equals(manifest_data))
 
     def test_get_all_plots_path(self):
         dulwich_checkout(self._repo, b"origin/test_annotate_plot")
