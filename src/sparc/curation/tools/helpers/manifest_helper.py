@@ -79,6 +79,9 @@ class ManifestDataFrame(metaclass=Singleton):
         self._manifestDataFrame[FILE_LOCATION_COLUMN] = ''
         self._manifestDataFrame[MANIFEST_DIR_COLUMN] = manifest_dir
 
+    def is_empty(self):
+        return self._manifestDataFrame.empty
+
     def check_directory_write_permission(self, directory_path):
         """
         Checks the write permission for a given directory and raises an exception if it is not writable.
