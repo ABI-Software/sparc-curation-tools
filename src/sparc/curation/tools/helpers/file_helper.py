@@ -345,8 +345,6 @@ def search_for_plot_files(dataset_dir):
     return plot_files
 
 
-
-
 class OnDiskFiles(metaclass=Singleton):
     """
     Singleton class for managing on-disk files.

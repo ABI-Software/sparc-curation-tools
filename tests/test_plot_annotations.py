@@ -51,8 +51,8 @@ class TestPlotAnnotations(unittest.TestCase):
         annotate_plot_from_plot_paths(plot_paths)
         manifest_data = pd.read_excel(manifest_file)
 
-        dulwich_clean(self._repo, self._repo.path)
         self.assertTrue(expected_data.equals(manifest_data))
+        dulwich_clean(self._repo, self._repo.path)
 
     def test_get_all_plots_path(self):
         dulwich_checkout(self._repo, b"origin/test_annotate_plot")
@@ -63,7 +63,7 @@ class TestPlotAnnotations(unittest.TestCase):
 
         plot_paths = get_all_plots_path()
         plot_files = ['stim_distal-colon_manometry.csv', 'stim_proximal-colon_manometry.csv',
-                      'stim_transverse-colon_manometry.csv', 'sub-001_ses-001_P_log.csv', 'sub-002_ses-003_T_log.csv']
+                      'stim_transverse-colon_manometry.csv', 'sub-001_ses-001_P_log.txt', 'sub-002_ses-003_T_log.txt']
         expected_data = [os.path.join(here, "resources", 'derivative', f) for f in plot_files]
 
         self.assertEqual(set(plot_paths), set(expected_data))
