@@ -15,6 +15,8 @@ def get_dataset_dir():
 
 def update_context_info(context_info):
     context_info_location = get_absolute_path(get_dataset_dir(), context_info.get_filename())
+    if ManifestDataFrame().is_empty():
+        ManifestDataFrame().check_directory_write_permission(os.path.dirname(context_info_location))
     metadata_location = get_absolute_path(get_dataset_dir(), context_info.get_metadata_file())
     annotation_data = create_annotation_data_json(context_info.get_views(), context_info.get_samples())
     write_context_info(context_info_location, context_info.as_dict())
