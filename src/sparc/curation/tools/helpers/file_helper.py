@@ -381,6 +381,9 @@ class OnDiskFiles(metaclass=Singleton):
         'thumbnail': [],
     }
 
+    def is_defined(self):
+        return self._dataset_dir is not None
+
     def setup_dataset(self, dataset_dir, max_size):
         """
         Set up the dataset by searching for the required files.

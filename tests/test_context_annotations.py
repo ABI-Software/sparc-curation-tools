@@ -3,11 +3,14 @@ import os.path
 
 import unittest
 
+import pandas as pd
 from sparc.curation.tools import context_annotations
+from sparc.curation.tools.context_annotations import annotate_context_info
+from sparc.curation.tools.helpers.file_helper import OnDiskFiles
 from sparc.curation.tools.models.contextinfo import ContextInfoAnnotation
 from sparc.curation.tools.utilities import convert_to_bytes
 
-from gitresources import dulwich_checkout, setup_resources, dulwich_proper_stash_and_drop
+from gitresources import dulwich_checkout, setup_resources, dulwich_proper_stash_and_drop, dulwich_clean
 
 here = os.path.abspath(os.path.dirname(__file__))
 
@@ -29,6 +32,7 @@ class ScaffoldAnnotationTestCase(unittest.TestCase):
         self._max_size = convert_to_bytes("2MiB")
 
     def tearDown(self):
+        dulwich_clean(self._repo, self._repo.path)
         dulwich_proper_stash_and_drop(self._repo)
 
     def test_context_info_annotations(self):
@@ -120,6 +124,32 @@ class ScaffoldAnnotationTestCase(unittest.TestCase):
 
         ci = ContextInfoAnnotation(os.path.basename(context_files[0]), context_files[0])
         self._compare_update(ci, content, "Generic rat brainstem scaffold")
+
+    def test_context_info_annotation(self):
+        dulwich_checkout(self._repo, b"origin/context_annotations_no_scaffold_annotations")
+        dataset_dir = os.path.join(here, "resources")
+        context_files = context_annotations.search_for_context_data_files(dataset_dir, convert_to_bytes("2MiB"))
+
+        self.assertEqual(1, len(context_files))
+        with open(context_files[0]) as f:
+            content = json.load(f)
+
+        self.assertEqual("0.2.0", content["version"])
+        self.assertEqual("Rat brainstem scaffold", content["heading"])
+
+        ci = ContextInfoAnnotation(os.path.basename(context_files[0]), context_files[0])
+        self._compare_update(ci, content, "Rat brainstem scaffold", 2)
+
+        OnDiskFiles().setup_dataset(dataset_dir, convert_to_bytes("2MiB"))
+
+        annotate_context_info(ci)
+
+        manifest_file = os.path.join(here, 'resources', 'derivative', 'manifest.xlsx')
+        expected_file = os.path.join(here, 'resources', 'derivative', 'manifest_expected.xlsx')
+        manifest_data = pd.read_excel(manifest_file)
+        expected_data = pd.read_excel(expected_file)
+
+        self.assertTrue(expected_data.equals(manifest_data))
 
     def _compare_update(self, ci, content, heading='', views_len=0, samples_len=0):
         self.assertEqual("0.2.0", ci.get_version())

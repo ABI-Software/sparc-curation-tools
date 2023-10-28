@@ -79,8 +79,11 @@ class ManifestDataFrame(metaclass=Singleton):
         self._manifestDataFrame[FILE_LOCATION_COLUMN] = ''
         self._manifestDataFrame[MANIFEST_DIR_COLUMN] = manifest_dir
 
+    def is_defined(self):
+        return self._manifestDataFrame is not None
+
     def is_empty(self):
-        return self._manifestDataFrame.empty
+        return self._manifestDataFrame is None or self._manifestDataFrame.empty
 
     def check_directory_write_permission(self, directory_path):
         """
@@ -294,6 +297,7 @@ class ManifestDataFrame(metaclass=Singleton):
         for index, row in fileDF.iterrows():
             mDF = pd.read_excel(os.path.join(row[MANIFEST_DIR_COLUMN], MANIFEST_FILENAME),
                                 sheet_name=row[SHEET_NAME_COLUMN])
+
             if content and os.path.isabs(content):
                 content = os.path.relpath(content, row[MANIFEST_DIR_COLUMN])
             if column_name not in mDF.columns:
@@ -302,8 +306,16 @@ class ManifestDataFrame(metaclass=Singleton):
             if append:
                 mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name] \
                     = mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name].fillna(content)
-                mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name].apply(
-                    lambda x: x + "\n" + content if content not in x.split("\n") else x)
+                def _append_new_line_separated(x):
+                    if x:
+                        val = x + "\n" + content if content not in x.split("\n") else x
+                    else:
+                        val = content
+
+                    return val
+
+                result = mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name].apply(_append_new_line_separated)
+                mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name] = result
             else:
                 mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name] = content
 

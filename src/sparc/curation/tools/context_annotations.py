@@ -2,6 +2,7 @@ import json
 import os
 from pathlib import Path
 
+from sparc.curation.tools.errors import DatasetNotDefinedError
 from sparc.curation.tools.utilities import get_absolute_path
 from sparc.curation.tools.definitions import CONTEXT_INFO_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN
 from sparc.curation.tools.helpers.manifest_helper import ManifestDataFrame
@@ -15,11 +16,20 @@ def get_dataset_dir():
 
 def update_context_info(context_info):
     context_info_location = get_absolute_path(get_dataset_dir(), context_info.get_filename())
-    if ManifestDataFrame().is_empty():
+    write_context_info(context_info_location, context_info.as_dict())
+
+
+def annotate_context_info(context_info):
+    if not OnDiskFiles().is_defined():
+        raise DatasetNotDefinedError()
+
+    context_info_location = get_absolute_path(get_dataset_dir(), context_info.get_filename())
+    if not ManifestDataFrame().is_defined():
+        ManifestDataFrame().setup_dataframe(get_dataset_dir())
         ManifestDataFrame().check_directory_write_permission(os.path.dirname(context_info_location))
+
     metadata_location = get_absolute_path(get_dataset_dir(), context_info.get_metadata_file())
     annotation_data = create_annotation_data_json(context_info.get_views(), context_info.get_samples())
-    write_context_info(context_info_location, context_info.as_dict())
     update_additional_type(context_info_location)
     update_supplemental_json(context_info_location, json.dumps(annotation_data))
     update_derived_from_entity(context_info_location, os.path.basename(context_info.get_metadata_file()))

@@ -234,3 +234,10 @@ class BadManifestError(Exception):
     Inherits from Exception.
     """
     pass
+
+class DatasetNotDefinedError(AnnotationError):
+    """
+    Class for errors where the dataset for annotations has not
+    been defined.
+    """
+    pass
