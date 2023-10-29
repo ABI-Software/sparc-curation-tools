@@ -32,8 +32,8 @@ class ScaffoldAnnotationTestCase(unittest.TestCase):
         self._max_size = convert_to_bytes("2MiB")
 
     def tearDown(self):
-        dulwich_clean(self._repo, self._repo.path)
         dulwich_proper_stash_and_drop(self._repo)
+        dulwich_clean(self._repo, self._repo.path)
 
     def test_context_info_annotations(self):
         dulwich_checkout(self._repo, b"origin/scaffold_annotations_correct")

@@ -31,10 +31,10 @@ class TestPlotAnnotations(unittest.TestCase):
         self._max_size = convert_to_bytes("2MiB")
 
     def tearDown(self):
+        dulwich_clean(self._repo, self._repo.path)
         dulwich_proper_stash_and_drop(self._repo)
 
     def test_annotate_plot_from_plot_paths(self):
-        print('(test_annotate_plot_from_plot_paths)', end='')
         dulwich_checkout(self._repo, b"origin/test_annotate_plot")
 
         dataset_dir = os.path.join(here, "resources")
@@ -52,11 +52,9 @@ class TestPlotAnnotations(unittest.TestCase):
         annotate_plot_from_plot_paths(plot_paths)
         manifest_data = pd.read_excel(manifest_file)
 
-        dulwich_clean(self._repo, self._repo.path)
         self.assertTrue(expected_data.equals(manifest_data))
 
     def test_get_all_plots_path(self):
-        print('(test_get_all_plots_path)', end='')
         dulwich_checkout(self._repo, b"origin/test_annotate_plot")
 
         dataset_dir = os.path.join(here, "resources")
@@ -71,7 +69,6 @@ class TestPlotAnnotations(unittest.TestCase):
         self.assertEqual(set(plot_paths), set(expected_data))
 
     def test_get_plot_annotation_data(self):
-        print('(test_get_plot_annotation_data)', end='')
 
         plot_file = Plot("plot.png", [], plot_type="heatmap", no_header=False)
 

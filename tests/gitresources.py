@@ -29,7 +29,7 @@ def setup_resources():
 
 
 def dulwich_checkout(repo, target):
-    dulwich.porcelain.checkout_branch(repo, target, force=True)
+    dulwich.porcelain.checkout_branch(repo, target)
 
 
 def dulwich_clean(repo, target_dir):
