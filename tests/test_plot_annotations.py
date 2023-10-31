@@ -43,18 +43,16 @@ class TestPlotAnnotations(unittest.TestCase):
 
         manifest_file = os.path.join(here, 'resources', 'derivative', 'manifest.xlsx')
         expected_file = os.path.join(here, 'resources', 'derivative', 'manifest_expected.xlsx')
-        manifest_data = pd.read_excel(manifest_file)
-        expected_data = pd.read_excel(expected_file)
+        manifest_data = pd.read_excel(manifest_file).sort_values(by='filename', ignore_index=True)
+        expected_data = pd.read_excel(expected_file).sort_values(by='filename', ignore_index=True)
 
         self.assertFalse(expected_data.equals(manifest_data))
 
         plot_paths = get_all_plots_path()
         annotate_plot_from_plot_paths(plot_paths)
-        manifest_data = pd.read_excel(manifest_file)
+        manifest_data = pd.read_excel(manifest_file).sort_values(by='filename', ignore_index=True)
 
         dulwich_clean(self._repo, self._repo.path)
-        print('------------------------')
-        print(expected_data.compare(manifest_data))
         self.assertTrue(expected_data.equals(manifest_data))
 
     def test_get_all_plots_path(self):
@@ -76,6 +74,7 @@ class TestPlotAnnotations(unittest.TestCase):
         print('(test_get_plot_annotation_data)', end='')
 
         plot_file = Plot("plot.png", [], plot_type="heatmap", no_header=False)
+        # plot_file = plot_utilities.create_plot_from_plot_path('stim_distal-colon_manometry.csv')
 
         data = get_plot_annotation_data(plot_file)
 
@@ -88,6 +87,23 @@ class TestPlotAnnotations(unittest.TestCase):
         }
 
         self.assertEqual(expected_data, json.loads(data))
+
+    # def test_annotate_plot_files_in_sub_folder(self):
+    #     print('(test_annotate_plot_file_in_sub_folder)', end='')
+    #     dulwich_checkout(self._repo, b"origin/test_annotate_plot")
+    #
+    #     dataset_dir = os.path.join(here, "resources")
+    #     OnDiskFiles().setup_dataset(dataset_dir, self._max_size)
+    #     ManifestDataFrame().setup_dataframe(dataset_dir)
+    #
+    #     plot_paths = os.path.join(here, 'resources', 'derivative', 'sub_plot', 'PR1643-normalized-gene-counts.txt')
+    #     annotate_plot_from_plot_paths(plot_paths)
+    #
+    #     manifest_file = os.path.join(here, 'resources', 'derivative',  'sub_plot', 'manifest.xlsx')
+    #     expected_data = pd.DataFrame([['PR1643-normalized-gene-counts.txt', 'text/x.vnd.abi.plot+Tab-separated-values'],
+    #                                   ['PR1643-normalized-gene-counts.jpg', 'image/x.vnd.abi.thumbnail+jpeg']],
+    #                                  columns=['filename', 'additional types', 'Supplemental JSON Metadata',
+    #                                           'isDerivedFrom', 'isSourceOf'])
 
     def test_get_confirmation_message(self):
         confirmation_message = get_confirmation_message(error=None)
