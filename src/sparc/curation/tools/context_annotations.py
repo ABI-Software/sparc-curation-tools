@@ -24,10 +24,6 @@ def annotate_context_info(context_info):
         raise DatasetNotDefinedError()
 
     context_info_location = get_absolute_path(get_dataset_dir(), context_info.get_filename())
-    if not ManifestDataFrame().is_defined():
-        ManifestDataFrame().setup_dataframe(get_dataset_dir())
-        ManifestDataFrame().check_directory_write_permission(os.path.dirname(context_info_location))
-
     metadata_location = get_absolute_path(get_dataset_dir(), context_info.get_metadata_file())
     annotation_data = create_annotation_data_json(context_info.get_views(), context_info.get_samples())
     update_additional_type(context_info_location)
@@ -83,17 +79,6 @@ def update_parent_source_of_entity(file_location, parent_location):
 
 def update_derived_from_entity(file_location, parent_location):
     ManifestDataFrame().update_column_content(file_location, DERIVED_FROM_COLUMN, parent_location)
-
-
-def search_for_context_data_files(dataset_dir, max_size):
-    context_data_files = []
-    result = list(Path(dataset_dir).rglob("*"))
-    for r in result:
-        _is_context_data_file = is_json_of_type(r, max_size, is_context_data_file)
-        if _is_context_data_file:
-            context_data_files.append(r)
-
-    return context_data_files
 
 
 def search_for_annotation_csv_files(dataset_dir, max_size):

@@ -165,7 +165,7 @@ class IncorrectSourceOfError(IncorrectBaseError):
             target (str): Target file.
         """
         fileType = MIMETYPE_TO_FILETYPE_MAP.get(mime, 'unknown')
-        childrenFileType = MIMETYPE_TO_CHILDREN_FILETYPE_MAP.get(mime, 'unknown')
+        childrenFileType = ', '.join(MIMETYPE_TO_CHILDREN_FILETYPE_MAP.get(mime, 'unknown'))
         message = f"Found '{fileType}' file '{location}' either has no {childrenFileType} file or it's annotated to " \
                   f"an incorrect file. "
         super(IncorrectSourceOfError, self).__init__(message, location, mime, target)

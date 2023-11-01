@@ -1,6 +1,6 @@
 import os.path
 
-import pandas
+import pandas as pd
 import tabulate
 import unittest
 
@@ -47,7 +47,7 @@ class ScaffoldAnnotationTestCase(unittest.TestCase):
         OnDiskFiles().setup_dataset(dataset_dir, self._max_size)
         ManifestDataFrame().setup_dataframe(dataset_dir)
         errors = get_errors()
-        self.assertEqual(6, len(errors))
+        self.assertEqual(7, len(errors))
 
         fix_errors(errors)
 
@@ -98,7 +98,7 @@ class ScaffoldAnnotationTestCase(unittest.TestCase):
         fix_errors(errors)
 
         xlsx_file = os.path.join(dataset_dir, 'derivative', 'manifest.xlsx')
-        df = pandas.read_excel(xlsx_file)
+        df = pd.read_excel(xlsx_file)
 
         remaining_errors = get_errors()
 
@@ -152,7 +152,7 @@ class ScaffoldAnnotationTestCase(unittest.TestCase):
 
 
 def print_as_table(xlsx_file):
-    df = pandas.read_excel(xlsx_file)
+    df = pd.read_excel(xlsx_file)
 
     headers = [table_header(header) for header in df.keys()]
     print(tabulate.tabulate(df, headers=headers, tablefmt='simple'))

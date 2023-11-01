@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from sparc.curation.tools.helpers.base import Singleton
+from sparc.curation.tools.utilities import convert_to_bytes
 
 ZINC_GRAPHICS_TYPES = ["points", "lines", "surfaces", "contours", "streamlines"]
 
@@ -345,6 +346,17 @@ def search_for_plot_files(dataset_dir):
     return plot_files
 
 
+def search_for_context_data_files(dataset_dir, max_size):
+    context_data_files = []
+    result = list(Path(dataset_dir).rglob("*"))
+    for r in result:
+        _is_context_data_file = is_json_of_type(r, max_size, is_context_data_file)
+        if _is_context_data_file:
+            context_data_files.append(r)
+
+    return context_data_files
+
+
 class OnDiskFiles(metaclass=Singleton):
     """
     Singleton class for managing on-disk files.
@@ -380,6 +392,7 @@ class OnDiskFiles(metaclass=Singleton):
         'view': [],
         'thumbnail': [],
     }
+    _context_info_files = []
 
     def is_defined(self):
         return self._dataset_dir is not None
@@ -408,6 +421,9 @@ class OnDiskFiles(metaclass=Singleton):
         self._plot_files["plot"] = search_for_plot_files(self._dataset_dir)
         self._plot_files["thumbnail"] = filter_thumbnail_files_by_parent(self._image_paths,
                                                                          self._plot_files['plot'])
+
+        self._context_info_files = search_for_context_data_files(self._dataset_dir, convert_to_bytes("2MiB"))
+
         return self
 
     def get_dataset_dir(self):
@@ -476,3 +492,6 @@ class OnDiskFiles(metaclass=Singleton):
             list: List of all image file paths.
         """
         return [str(i) for i in self._image_paths]
+
+    def get_context_info_files(self):
+        return [str(i) for i in self._context_info_files]

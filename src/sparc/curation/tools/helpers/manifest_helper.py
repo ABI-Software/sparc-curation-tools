@@ -83,7 +83,7 @@ class ManifestDataFrame(metaclass=Singleton):
         return self._manifestDataFrame is not None
 
     def is_empty(self):
-        return self._manifestDataFrame is None or self._manifestDataFrame.empty
+        return self._manifestDataFrame.empty
 
     def check_directory_write_permission(self, directory_path):
         """
@@ -226,6 +226,9 @@ class ManifestDataFrame(metaclass=Singleton):
             file_name = os.path.relpath(file_location, manifest_dir)
         else:
             manifest_dir = os.path.dirname(file_location)
+            if manifestDataFrame.empty:
+                self.create_manifest(manifest_dir)
+
             file_name = os.path.basename(file_location)
 
         # Search data rows to find match to the same file by file_location.

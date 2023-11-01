@@ -1,3 +1,5 @@
+import os.path
+
 import pandas as pd
 
 from sparc.curation.tools.helpers.base import Singleton
@@ -6,7 +8,7 @@ from sparc.curation.tools.errors import IncorrectAnnotationError, NotAnnotatedEr
 from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN, FILENAME_COLUMN, ADDITIONAL_TYPES_COLUMN, \
     SCAFFOLD_META_MIME, SCAFFOLD_VIEW_MIME, \
     SCAFFOLD_THUMBNAIL_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN, MANIFEST_DIR_COLUMN, \
-    OLD_SCAFFOLD_MIMES
+    OLD_SCAFFOLD_MIMES, MIMETYPE_TO_PARENT_FILETYPE_MAP, MIMETYPE_TO_FILETYPE_MAP
 from sparc.curation.tools.helpers.file_helper import OnDiskFiles
 from sparc.curation.tools.helpers.manifest_helper import ManifestDataFrame
 
@@ -26,6 +28,7 @@ class ErrorManager(metaclass=Singleton):
         self.manifest_metadata_files = None
         self.manifest_view_files = None
         self.manifest_thumbnail_files = None
+        self.on_disk_context_info_files = None
 
         self.update_content()
 
@@ -37,6 +40,7 @@ class ErrorManager(metaclass=Singleton):
         self.on_disk_view_files = self.on_disk.get_view_files()
         self.on_disk_thumbnail_files = self.on_disk.get_thumbnail_files()
         self.on_disk_plot_thumbnail_files = self.on_disk.get_plot_thumbnails()
+        self.on_disk_context_info_files = self.on_disk.get_context_info_files()
 
         self.manifest_metadata_files = self.manifest.get_matching_entry(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_META_MIME,
                                                                         FILE_LOCATION_COLUMN)
@@ -165,37 +169,48 @@ class ErrorManager(metaclass=Singleton):
 
         return errors
 
-    def _process_incorrect_source_of(self, on_disk_files, on_disk_child_files, manifest_files, incorrect_mime):
+    def _process_incorrect_source_of(self, on_disk_files, mimetype, on_disk_child_files):
         """
         Helper method to process incorrect source of errors.
 
         Args:
             on_disk_files (list): List of on-disk files.
+            mimetype (str): MIME type of source file type.
             on_disk_child_files (list): List of child files on disk.
-            manifest_files (list): List of manifest files.
-            incorrect_mime (str): Incorrect MIME type.
 
         Returns:
             list: List of IncorrectSourceOfError objects.
         """
         errors = []
-
-        for i in manifest_files:
-            if i in on_disk_files:
-                manifest_source_of = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, i, SOURCE_OF_COLUMN)
-
-                if pd.isna(manifest_source_of).any() or len(manifest_source_of) == 0:
-                    errors.append(IncorrectSourceOfError(i, incorrect_mime, on_disk_child_files))
+        for on_disk_file in on_disk_files:
+            source_ofs = self.manifest.get_source_of(on_disk_file)
+            for source_of_entry in source_ofs:
+                if not pd.isna(source_of_entry):
+                    source_of_entries = source_of_entry.split('\n')
+                    for source_of in source_of_entries:
+                        source_of_mimetype = self.manifest.get_matching_entry(FILENAME_COLUMN, source_of, ADDITIONAL_TYPES_COLUMN)
+                        if _is_valid_mimetype_for(mimetype, source_of_mimetype[0]):
+                            on_disk_source_of = self.manifest.get_matching_entry(FILENAME_COLUMN, source_of, FILE_LOCATION_COLUMN)
+                            if not os.path.isfile(on_disk_source_of[0]):
+                                errors.append(IncorrectSourceOfError(on_disk_file, mimetype, on_disk_child_files))
+                        else:
+                            corrected_source_of_entries = source_of_entries[:] + on_disk_child_files
+                            corrected_source_of_entries.remove(source_of)
+                            errors.append(IncorrectSourceOfError(on_disk_file, mimetype, corrected_source_of_entries))
                 else:
-                    source_of_files_list = []
-                    source_ofs = manifest_source_of[0].split("\n")
-                    for source_of in source_ofs:
-                        source_of_files = self.manifest.get_matching_entry(FILENAME_COLUMN, source_of,
-                                                                           FILE_LOCATION_COLUMN)
-                        source_of_files_list.extend(source_of_files)
+                    errors.append(IncorrectSourceOfError(on_disk_file, mimetype, on_disk_child_files))
 
-                    if not all([item in on_disk_child_files for item in source_of_files_list]):
-                        errors.append(IncorrectSourceOfError(i, incorrect_mime, on_disk_child_files))
+        if len(errors) == 0:
+            for on_disk_file in on_disk_child_files:
+                derived_from = self.manifest.get_derived_from(on_disk_file)
+                for derived_from_entry in derived_from:
+                    if not pd.isna(derived_from_entry):
+                        on_disk_dervied_from = self.manifest.get_matching_entry(FILENAME_COLUMN, derived_from_entry, FILE_LOCATION_COLUMN)
+                        derived_from_source_of = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, on_disk_dervied_from[0], SOURCE_OF_COLUMN)
+                        derived_from_filename = self.manifest.get_filename(on_disk_file)
+                        if not derived_from_source_of or derived_from_filename[0] not in derived_from_source_of[0].split('\n'):
+                            errors.append(IncorrectSourceOfError(on_disk_dervied_from[0], mimetype, on_disk_child_files))
+
 
         return errors
 
@@ -208,12 +223,11 @@ class ErrorManager(metaclass=Singleton):
         """
         errors = []
 
-        metadata_source_of_errors = self._process_incorrect_source_of(
-            self.on_disk_metadata_files, self.on_disk_view_files, self.manifest_metadata_files, SCAFFOLD_META_MIME)
+        on_disk_source_of_files = self.on_disk_view_files + self.on_disk_context_info_files
+        metadata_source_of_errors = self._process_incorrect_source_of(self.on_disk_metadata_files, SCAFFOLD_META_MIME, on_disk_source_of_files)
         errors.extend(metadata_source_of_errors)
 
-        view_source_of_errors = self._process_incorrect_source_of(self.on_disk_view_files, self.on_disk_thumbnail_files,
-                                                                  self.manifest_view_files, SCAFFOLD_VIEW_MIME)
+        view_source_of_errors = self._process_incorrect_source_of(self.on_disk_view_files, SCAFFOLD_VIEW_MIME, self.on_disk_thumbnail_files)
         errors.extend(view_source_of_errors)
 
         return errors
@@ -382,3 +396,10 @@ def calculate_match(item1, item2):
 
     # Return the match rating as an integer.
     return len(common_prefix)
+
+
+def _is_valid_mimetype_for(target_mimetype, source_mimetype):
+    if MIMETYPE_TO_FILETYPE_MAP.get(target_mimetype, 'unknown') == MIMETYPE_TO_PARENT_FILETYPE_MAP.get(source_mimetype, 'not-found'):
+        return True
+
+    return False
