@@ -30,6 +30,7 @@ def setup_resources():
 
 def dulwich_checkout(repo, target):
     dulwich.porcelain.checkout_branch(repo, target)
+    dulwich_clean(repo, repo.path)
 
 
 def dulwich_clean(repo, target_dir):

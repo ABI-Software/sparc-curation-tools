@@ -56,6 +56,7 @@ class ManifestDataFrame(metaclass=Singleton):
                 currentDataFrame[SHEET_NAME_COLUMN] = sheet_name
                 currentDataFrame[MANIFEST_DIR_COLUMN] = os.path.dirname(r)
                 self._manifestDataFrame = pd.concat([currentDataFrame, self._manifestDataFrame])
+                xl_file.close()
 
         if not self._manifestDataFrame.empty:
             self._manifestDataFrame[FILE_LOCATION_COLUMN] = self._manifestDataFrame.apply(
