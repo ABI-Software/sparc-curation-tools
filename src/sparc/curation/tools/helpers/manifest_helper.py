@@ -50,13 +50,12 @@ class ManifestDataFrame(metaclass=Singleton):
         """
         self._manifestDataFrame = pd.DataFrame()
         for r in Path(self._dataset_dir).rglob(MANIFEST_FILENAME):
-            xl_file = pd.ExcelFile(r)
-            for sheet_name in xl_file.sheet_names:
-                currentDataFrame = xl_file.parse(sheet_name)
-                currentDataFrame[SHEET_NAME_COLUMN] = sheet_name
-                currentDataFrame[MANIFEST_DIR_COLUMN] = os.path.dirname(r)
-                self._manifestDataFrame = pd.concat([currentDataFrame, self._manifestDataFrame])
-                xl_file.close()
+            with pd.ExcelFile(r) as xl_file:
+                for sheet_name in xl_file.sheet_names:
+                    currentDataFrame = xl_file.parse(sheet_name)
+                    currentDataFrame[SHEET_NAME_COLUMN] = sheet_name
+                    currentDataFrame[MANIFEST_DIR_COLUMN] = os.path.dirname(r)
+                    self._manifestDataFrame = pd.concat([currentDataFrame, self._manifestDataFrame])
 
         if not self._manifestDataFrame.empty:
             self._manifestDataFrame[FILE_LOCATION_COLUMN] = self._manifestDataFrame.apply(

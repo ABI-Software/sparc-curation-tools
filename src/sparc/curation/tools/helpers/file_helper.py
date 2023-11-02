@@ -5,6 +5,7 @@ from pathlib import Path
 
 from sparc.curation.tools.helpers.base import Singleton
 from sparc.curation.tools.utilities import convert_to_bytes
+from sparc.curation.tools.plot_utilities import generate_dataframe_from_txt
 
 ZINC_GRAPHICS_TYPES = ["points", "lines", "surfaces", "contours", "streamlines"]
 
@@ -341,7 +342,9 @@ def search_for_plot_files(dataset_dir):
     plot_files += tsv_files
 
     txt_files = list(Path(dataset_dir).rglob("*txt"))
-    plot_files += txt_files
+    for txt_file in txt_files:
+        if generate_dataframe_from_txt(txt_file) is not None:
+            plot_files.append(txt_file)
 
     return plot_files
 
