@@ -1,47 +1,173 @@
 import argparse
 import os
 
-from sparc.curation.tools.definitions import MANIFEST_DIR_COLUMN
-from sparc.curation.tools.errors import NotAnnotatedError, IncorrectAnnotationError, IncorrectDerivedFromError, IncorrectSourceOfError, OldAnnotationError
-from sparc.curation.tools.errors import AnnotationDirectoryNoWriteAccess
-from sparc.curation.tools.manifests import ManifestDataFrame
-from sparc.curation.tools.ondisk import OnDiskFiles
+from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN
+from sparc.curation.tools.helpers.error_helper import ErrorManager
+from sparc.curation.tools.helpers.file_helper import OnDiskFiles
+from sparc.curation.tools.helpers.manifest_helper import ManifestDataFrame
 from sparc.curation.tools.utilities import convert_to_bytes
 
 
+def setup_data(dataset_dir, max_size):
+    """
+    Sets up the dataset by retrieving data from the on-disk files and initializing the manifest dataframe.
+
+    Args:
+        dataset_dir (str): The directory path where the dataset will be set up.
+        max_size (str): The maximum size that the dataset should occupy.
+
+    Returns:
+        None
+    """
+    OnDiskFiles().setup_dataset(dataset_dir, convert_to_bytes(max_size))
+    ManifestDataFrame().setup_dataframe(dataset_dir)
+
+
+# OnDisk section
+def get_on_disk_metadata_files():
+    return OnDiskFiles().get_metadata_files()
+
+
+def get_on_disk_view_files():
+    return OnDiskFiles().get_view_files()
+
+
+def get_on_disk_thumbnail_files():
+    return OnDiskFiles().get_thumbnail_files()
+
+
+# Manifest section
+def get_filename_by_location(object_text):
+    ManifestDataFrame().get_matching_entry(FILE_LOCATION_COLUMN, object_text)
+
+
+def update_column_content(subject_text, predicate_text, object_value, append):
+    ManifestDataFrame().update_column_content(subject_text, predicate_text, object_value, append)
+
+
+def get_annotated_scaffold_dictionary():
+    """
+    Build and return a scaffold dictionary based on scaffold annotation in manifest files.
+    The annotated scaffold dictionary has the following structure:
+    {
+        metadata_filename: {
+            view_file: [thumbnail_filenames]
+        }
+    }
+
+    Returns:
+        dict: Scaffold dictionary.
+    """
+    manifest = ManifestDataFrame()
+    annotated_scaffold_dictionary = {}
+
+    # Get a list of metadata filenames in the manifest
+    metadata_files = manifest.scaffold_get_metadata_files()
+
+    for metadata_file in metadata_files:
+        # Get the directory where the metadata file is located
+        manifest_dir = manifest.get_manifest_directory(metadata_file)[0]
+
+        # Get a list of view filenames associated with the metadata
+        view_filenames = manifest.get_source_of(metadata_file)
+        # Create an empty dictionary to store view and thumbnail information for this metadata
+        metadata_entry = {}
+
+        # View filenames can have multiple lines separated by a newline.
+        if isinstance(view_filenames, list) and len(view_filenames):
+            if not isinstance(view_filenames[0], float):
+                view_filenames = list(filter(None, view_filenames[0].split('\n')))
+
+        for view in view_filenames:
+            view_filename = os.path.join(manifest_dir, view)
+
+            # Get a list of thumbnail filenames associated with the view
+            thumbnail_filenames = manifest.get_source_of(view_filename)
+
+            # Create a list to store thumbnail information for this view
+            view_entry = [os.path.join(manifest_dir, thumbnail) for thumbnail in thumbnail_filenames
+                          if not isinstance(thumbnail, float)]
+
+            # Add the view entry to the metadata entry
+            metadata_entry[view_filename] = view_entry
+
+        # Add the metadata entry to the annotated scaffold dictionary
+        annotated_scaffold_dictionary[metadata_file] = metadata_entry
+
+    return annotated_scaffold_dictionary
+
+
+# Error section
 def check_for_old_annotations():
+    """
+    Checks for old annotations in the manifest dataframe.
+
+    Returns:
+        list: A list of errors related to old annotations.
+    """
     errors = []
-    errors += ManifestDataFrame().get_scaffold_data().get_old_annotations()
+    errors += ErrorManager().get_old_annotations()
     return errors
 
 
 def check_additional_types_annotations():
+    """
+    Checks for errors in additional types annotations in the manifest dataframe.
+
+    Returns:
+        list: A list of errors related to additional types annotations.
+    """
     errors = []
-    errors += ManifestDataFrame().get_scaffold_data().get_missing_annotations(OnDiskFiles())
-    errors += ManifestDataFrame().get_scaffold_data().get_incorrect_annotations(OnDiskFiles())
+    errors += ErrorManager().get_missing_annotations()
+    errors += ErrorManager().get_incorrect_annotations()
     return errors
 
 
 def check_derived_from_annotations():
+    """
+    Checks for errors in derived from annotations in the manifest dataframe.
+
+    Returns:
+        list: A list of errors related to derived from annotations.
+    """
     errors = []
-    errors += ManifestDataFrame().get_scaffold_data().get_incorrect_derived_from(OnDiskFiles())
+    errors += ErrorManager().get_incorrect_derived_from()
     return errors
 
 
 def check_source_of_annotations():
+    """
+    Checks for errors in source of annotations in the manifest dataframe.
+
+    Returns:
+        list: A list of errors related to source of annotations.
+    """
     errors = []
-    errors.extend(ManifestDataFrame().get_scaffold_data().get_incorrect_source_of(OnDiskFiles()))
+    errors.extend(ErrorManager().get_incorrect_source_of())
     return errors
 
 
 def check_complementary_annotations():
+    """
+    Checks for errors in complementary annotations in the manifest dataframe.
+
+    Returns:
+        list: A list of errors related to complementary annotations.
+    """
     errors = []
-    errors.extend(ManifestDataFrame().get_scaffold_data().get_incorrect_complementary(OnDiskFiles()))
+    errors.extend(ErrorManager().get_incorrect_complementary())
     return errors
 
 
 def get_errors():
+    """
+    Retrieves all the errors in the manifest dataframe.
+
+    Returns:
+        list: A list of all errors in the manifest dataframe.
+    """
     errors = []
+    ErrorManager().update_content()
     errors.extend(check_for_old_annotations())
     errors.extend(check_additional_types_annotations())
     errors.extend(check_complementary_annotations())
@@ -61,32 +187,11 @@ def get_confirmation_message(error=None):
     if error is None:
         return "Let this magic tool fix all errors for you?"
 
-    message = "Let this magic tool fix this error for you?"
-    return message
+    return "Let this magic tool fix this error for you?"
 
 
 def fix_error(error):
-    checked_locations = []
-
-    manifest = ManifestDataFrame().get_manifest()
-    if manifest.empty:
-        ManifestDataFrame().create_manifest(error.get_location())
-    else:
-        for manifest_dir in manifest[MANIFEST_DIR_COLUMN]:
-            if manifest_dir not in checked_locations:
-                checked_locations.append(manifest_dir)
-                if not os.access(manifest_dir, os.W_OK):
-                    raise AnnotationDirectoryNoWriteAccess(f"Cannot write to directory {manifest_dir}.")
-
-    # Correct old annotation first, then incorrect annotation, and lastly no annotation.
-    if isinstance(error, OldAnnotationError) or isinstance(error, IncorrectAnnotationError):
-        ManifestDataFrame().update_additional_type(error.get_location(), None)
-    elif isinstance(error, NotAnnotatedError):
-        ManifestDataFrame().update_additional_type(error.get_location(), error.get_mime())
-    elif isinstance(error, IncorrectDerivedFromError):
-        ManifestDataFrame().get_scaffold_data().update_derived_from(error.get_location(), error.get_mime(), error.get_target())
-    elif isinstance(error, IncorrectSourceOfError):
-        ManifestDataFrame().get_scaffold_data().update_source_of(error.get_location(), error.get_mime(), error.get_target())
+    ErrorManager().fix_error(error)
 
 
 def fix_errors(errors):
@@ -114,7 +219,8 @@ def fix_errors(errors):
 def main():
     parser = argparse.ArgumentParser(description='Check scaffold annotations for a SPARC dataset.')
     parser.add_argument("dataset_dir", help='directory to check.')
-    parser.add_argument("-m", "--max-size", help="Set the max size for metadata file. Default is 2MiB", default='2MiB', type=convert_to_bytes)
+    parser.add_argument("-m", "--max-size", help="Set the max size for metadata file. Default is 2MiB", default='2MiB',
+                        type=convert_to_bytes)
     parser.add_argument("-r", "--report", help="Report any errors that were found.", action='store_true')
     parser.add_argument("-f", "--fix", help="Fix any errors that were found.", action='store_true')
 
@@ -144,7 +250,7 @@ def main():
     errors = get_errors()
 
     # Step 4:
-    #   - Report an differences from step 1 and 2.
+    #   - Report a differences from step 1 and 2.
     if args.report:
         for error in errors:
             print(error.get_error_message())

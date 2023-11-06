@@ -2,21 +2,30 @@ import json
 import os
 from pathlib import Path
 
+from sparc.curation.tools.errors import DatasetNotDefinedError
 from sparc.curation.tools.utilities import get_absolute_path
 from sparc.curation.tools.definitions import CONTEXT_INFO_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN
-from sparc.curation.tools.manifests import ManifestDataFrame
-from sparc.curation.tools.ondisk import is_json_of_type, is_csv_of_type, is_context_data_file, is_annotation_csv_file
+from sparc.curation.tools.helpers.manifest_helper import ManifestDataFrame
+from sparc.curation.tools.helpers.file_helper import OnDiskFiles
+from sparc.curation.tools.helpers.file_helper import is_json_of_type, is_csv_of_type, is_context_data_file, is_annotation_csv_file
 
 
 def get_dataset_dir():
-    return ManifestDataFrame().get_dataset_dir()
+    return OnDiskFiles().get_dataset_dir()
 
 
 def update_context_info(context_info):
     context_info_location = get_absolute_path(get_dataset_dir(), context_info.get_filename())
+    write_context_info(context_info_location, context_info.as_dict())
+
+
+def annotate_context_info(context_info):
+    if not OnDiskFiles().is_defined():
+        raise DatasetNotDefinedError()
+
+    context_info_location = get_absolute_path(get_dataset_dir(), context_info.get_filename())
     metadata_location = get_absolute_path(get_dataset_dir(), context_info.get_metadata_file())
     annotation_data = create_annotation_data_json(context_info.get_views(), context_info.get_samples())
-    write_context_info(context_info_location, context_info.as_dict())
     update_additional_type(context_info_location)
     update_supplemental_json(context_info_location, json.dumps(annotation_data))
     update_derived_from_entity(context_info_location, os.path.basename(context_info.get_metadata_file()))
@@ -70,17 +79,6 @@ def update_parent_source_of_entity(file_location, parent_location):
 
 def update_derived_from_entity(file_location, parent_location):
     ManifestDataFrame().update_column_content(file_location, DERIVED_FROM_COLUMN, parent_location)
-
-
-def search_for_context_data_files(dataset_dir, max_size):
-    context_data_files = []
-    result = list(Path(dataset_dir).rglob("*"))
-    for r in result:
-        _is_context_data_file = is_json_of_type(r, max_size, is_context_data_file)
-        if _is_context_data_file:
-            context_data_files.append(r)
-
-    return context_data_files
 
 
 def search_for_annotation_csv_files(dataset_dir, max_size):

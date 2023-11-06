@@ -1,4 +1,3 @@
-
 SPARC Curation Tools
 ====================
 

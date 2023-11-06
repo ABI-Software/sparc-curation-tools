@@ -32,7 +32,7 @@ readme.append('')
 software_licence = readfile("LICENSE", True)
 software_licence = '\n  '.join(software_licence)
 
-requires = ['pandas', 'openpyxl', 'tabulate']
+requires = ['pandas', 'openpyxl', 'tabulate', 'plotly', 'kaleido']
 
 extras_require = {
     'test': [
