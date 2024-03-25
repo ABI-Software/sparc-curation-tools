@@ -1,7 +1,7 @@
 import os
 import kaleido
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 if kaleido.__version__ == "0.2.1":
     kaleido_dir = os.path.dirname(os.path.abspath(kaleido.__file__))
