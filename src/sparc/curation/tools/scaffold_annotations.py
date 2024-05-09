@@ -2,7 +2,7 @@ import argparse
 import os
 
 from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN
-from sparc.curation.tools.helpers.error_helper import ErrorManager
+from sparc.curation.tools.helpers.error_helper import ErrorManager, fix_error
 from sparc.curation.tools.helpers.file_helper import OnDiskFiles
 from sparc.curation.tools.helpers.manifest_helper import ManifestDataFrame
 from sparc.curation.tools.utilities import convert_to_bytes
@@ -188,10 +188,6 @@ def get_confirmation_message(error=None):
         return "Let this magic tool fix all errors for you?"
 
     return "Let this magic tool fix this error for you?"
-
-
-def fix_error(error):
-    ErrorManager().fix_error(error)
 
 
 def fix_errors(errors):

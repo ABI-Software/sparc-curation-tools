@@ -1,12 +1,11 @@
 import os.path
 
 import pandas as pd
-import tabulate
 import unittest
 
 from sparc.curation.tools.helpers.manifest_helper import ManifestDataFrame
 from sparc.curation.tools.helpers.file_helper import OnDiskFiles
-from sparc.curation.tools.scaffold_annotations import get_errors, fix_errors
+from sparc.curation.tools.scaffold_annotations import get_errors, fix_errors, fix_error
 from sparc.curation.tools.utilities import convert_to_bytes
 
 from gitresources import dulwich_checkout, setup_resources, dulwich_proper_stash_and_drop
@@ -46,6 +45,8 @@ class ScaffoldAnnotationTestCase(unittest.TestCase):
         dataset_dir = os.path.join(here, "resources")
         OnDiskFiles().setup_dataset(dataset_dir, self._max_size)
         ManifestDataFrame().setup_dataframe(dataset_dir)
+        manifest = os.path.join(dataset_dir, 'derivative', 'Scaffold', 'manifest.xlsx')
+
         errors = get_errors()
         self.assertEqual(7, len(errors))
 
@@ -150,28 +151,37 @@ class ScaffoldAnnotationTestCase(unittest.TestCase):
         os.remove(manifest_file)
         self.assertFalse(os.path.isfile(manifest_file))
 
+    def test_correct_annotations_with_vtk_and_stl(self):
+        dulwich_checkout(self._repo, b"origin/scaffold_with_vtk_and_stl")
+        dataset_dir = os.path.join(here, "resources")
+        files = os.listdir(os.path.join(dataset_dir, "derivative"))
 
-def print_as_table(xlsx_file):
-    df = pd.read_excel(xlsx_file)
+        self.assertIn("rat_brainstem_zinc_graphics.stl", files)
+        self.assertIn("rat_brainstem_root.vtk", files)
 
-    headers = [table_header(header) for header in df.keys()]
-    print(tabulate.tabulate(df, headers=headers, tablefmt='simple'))
+        OnDiskFiles().setup_dataset(dataset_dir, self._max_size)
+        ManifestDataFrame().setup_dataframe(dataset_dir)
 
+        errors = get_errors()
+        self.assertEqual(2, len(errors))
 
-def print_errors(errors):
-    for i, e in enumerate(errors):
-        print(i + 1, e.get_error_message())
+        fix_error(errors[0])
+        fix_error(errors[1])
 
+        remaining_errors = get_errors()
+        self.assertEqual(2, len(remaining_errors))
 
-def table_header(in_header):
-    if in_header == 'timestamp':
-        return 'ts'
-    elif in_header == 'file type':
-        return 'type'
-    elif in_header.startswith('Unnamed'):
-        return '*'
+        fix_error(remaining_errors[0])
+        fix_error(remaining_errors[1])
 
-    return in_header
+        remaining_errors = get_errors()
+        self.assertEqual(2, len(remaining_errors))
+
+        fix_error(remaining_errors[0])
+        fix_error(remaining_errors[1])
+
+        remaining_errors = get_errors()
+        self.assertEqual(0, len(remaining_errors))
 
 
 if __name__ == "__main__":

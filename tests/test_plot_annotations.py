@@ -36,33 +36,26 @@ class TestPlotAnnotations(unittest.TestCase):
 
     def test_annotate_plot_from_plot_paths(self):
         dulwich_checkout(self._repo, b"origin/test_annotate_plot")
-        print('1a')
 
         dataset_dir = os.path.join(here, "resources")
         OnDiskFiles().setup_dataset(dataset_dir, self._max_size)
         ManifestDataFrame().setup_dataframe(dataset_dir)
-        print('1b')
 
         manifest_file = os.path.join(here, 'resources', 'derivative', 'manifest.xlsx')
         expected_file = os.path.join(here, 'resources', 'derivative', 'manifest_expected.xlsx')
         manifest_data = pd.read_excel(manifest_file).sort_values(by='filename', ignore_index=True)
         expected_data = pd.read_excel(expected_file).sort_values(by='filename', ignore_index=True)
-        print('1c')
 
         self.assertFalse(expected_data.equals(manifest_data))
-        print('1d')
 
         plot_paths = get_all_plots_path()
         annotate_plot_from_plot_paths(plot_paths)
         manifest_data = pd.read_excel(manifest_file).sort_values(by='filename', ignore_index=True)
-        print('1e')
 
         self.assertTrue(expected_data.equals(manifest_data))
-        print('1f')
 
     def test_get_all_plots_path(self):
         dulwich_checkout(self._repo, b"origin/test_annotate_plot")
-        print('2')
 
         dataset_dir = os.path.join(here, "resources")
         OnDiskFiles().setup_dataset(dataset_dir, self._max_size)
@@ -79,7 +72,6 @@ class TestPlotAnnotations(unittest.TestCase):
 
         plot_file = Plot("plot.png", [], plot_type="heatmap", no_header=False)
         # plot_file = plot_utilities.create_plot_from_plot_path('stim_distal-colon_manometry.csv')
-        print('3')
 
         data = get_plot_annotation_data(plot_file)
 
@@ -95,7 +87,6 @@ class TestPlotAnnotations(unittest.TestCase):
 
     def test_annotate_txt_plot_files(self):
         dulwich_checkout(self._repo, b"origin/txt_plot_files")
-        print('4')
 
         dataset_dir = os.path.join(here, "resources")
         OnDiskFiles().setup_dataset(dataset_dir, self._max_size)
@@ -113,7 +104,6 @@ class TestPlotAnnotations(unittest.TestCase):
 
     def test_get_confirmation_message(self):
         confirmation_message = get_confirmation_message(error=None)
-        print('5')
 
         self.assertEqual(confirmation_message, "Let this magic tool annotate all plots for you?")
 

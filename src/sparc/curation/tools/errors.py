@@ -111,7 +111,7 @@ class IncorrectBaseError(ScaffoldAnnotationError):
     Inherits from ScaffoldAnnotationError.
     """
 
-    def __init__(self, message, location, mime, target):
+    def __init__(self, message, location, mime, target, replace=False):
         """
         Initialize the IncorrectBaseError object.
 
@@ -123,6 +123,7 @@ class IncorrectBaseError(ScaffoldAnnotationError):
         """
         super(IncorrectBaseError, self).__init__(message, location, mime)
         self._target = target
+        self._replace = replace
 
     def get_target(self):
         """
@@ -132,6 +133,15 @@ class IncorrectBaseError(ScaffoldAnnotationError):
             str: Target file.
         """
         return self._target
+
+    def get_replace(self):
+        """
+        Get the replace state.
+
+        Returns:
+            bool: state
+        """
+        return self._replace
 
     def __eq__(self, other):
         """
@@ -155,7 +165,7 @@ class IncorrectSourceOfError(IncorrectBaseError):
     Inherits from IncorrectBaseError.
     """
 
-    def __init__(self, location, mime, target):
+    def __init__(self, location, mime, target, replace=False):
         """
         Initialize the IncorrectSourceOfError object.
 
@@ -163,12 +173,13 @@ class IncorrectSourceOfError(IncorrectBaseError):
             location (str): Location of the file.
             mime (str): MIME type of the file.
             target (str): Target file.
+            replace (bool): If removing an incorrect source of replace with current content.
         """
         fileType = MIMETYPE_TO_FILETYPE_MAP.get(mime, 'unknown')
         childrenFileType = ', '.join(MIMETYPE_TO_CHILDREN_FILETYPE_MAP.get(mime, 'unknown'))
         message = f"Found '{fileType}' file '{location}' either has no {childrenFileType} file or it's annotated to " \
                   f"an incorrect file. "
-        super(IncorrectSourceOfError, self).__init__(message, location, mime, target)
+        super(IncorrectSourceOfError, self).__init__(message, location, mime, target, replace)
 
 
 class IncorrectDerivedFromError(IncorrectBaseError):
