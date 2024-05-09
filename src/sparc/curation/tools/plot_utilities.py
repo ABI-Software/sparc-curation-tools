@@ -55,7 +55,7 @@ def generate_dataframe_from_txt(file_path):
     if csv_rows:
         df = pd.DataFrame(csv_rows)
     else:
-        df = pd.read_csv(file_path, header=None, delimiter='\t')
+        df = pd.read_csv(file_path, header=None, delimiter='\t', low_memory=False)
 
     if is_valid_plot(df):
         return df

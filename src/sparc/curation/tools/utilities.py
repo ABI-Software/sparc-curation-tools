@@ -3,6 +3,9 @@ import math
 import os
 import re
 
+import pandas as pd
+import tabulate
+
 from sparc.curation.tools.definitions import SIZE_NAME
 
 
@@ -48,3 +51,26 @@ def get_absolute_path(dataset_dir, filename):
     if os.path.exists(os.path.join(dataset_dir, "derivative")):
         dataset_dir = os.path.join(dataset_dir, "derivative")
     return os.path.join(dataset_dir, filename)
+
+
+def print_as_table(xlsx_file):
+    df = pd.read_excel(xlsx_file)
+
+    headers = [table_header(header) for header in df.keys()]
+    print(tabulate.tabulate(df, headers=headers, tablefmt='simple'))
+
+
+def print_errors(errors):
+    for i, e in enumerate(errors):
+        print(i + 1, e.get_error_message())
+
+
+def table_header(in_header):
+    if in_header == 'timestamp':
+        return 'ts'
+    elif in_header == 'file type':
+        return 'type'
+    elif in_header.startswith('Unnamed'):
+        return '*'
+
+    return in_header

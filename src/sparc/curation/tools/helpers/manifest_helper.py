@@ -52,7 +52,7 @@ class ManifestDataFrame(metaclass=Singleton):
         for r in Path(self._dataset_dir).rglob(MANIFEST_FILENAME):
             with pd.ExcelFile(r) as xl_file:
                 for sheet_name in xl_file.sheet_names:
-                    currentDataFrame = xl_file.parse(sheet_name)
+                    currentDataFrame = pd.read_excel(xl_file, sheet_name=sheet_name, dtype=str)
                     currentDataFrame[SHEET_NAME_COLUMN] = sheet_name
                     currentDataFrame[MANIFEST_DIR_COLUMN] = os.path.dirname(r)
                     self._manifestDataFrame = pd.concat([currentDataFrame, self._manifestDataFrame])
@@ -132,7 +132,7 @@ class ManifestDataFrame(metaclass=Singleton):
             unique_manifests = list(set(manifests))
             for manifest_dir in unique_manifests:
                 current_manifest = os.path.join(manifest_dir, MANIFEST_FILENAME)
-                mDF = pd.read_excel(current_manifest)
+                mDF = pd.read_excel(current_manifest, dtype=str)
                 mDF.rename(columns={bad_column_name: DERIVED_FROM_COLUMN}, inplace=True)
                 mDF.to_excel(current_manifest, index=False, header=True)
                 sanitised = True
@@ -203,7 +203,7 @@ class ManifestDataFrame(metaclass=Singleton):
 
     def scaffold_get_plot_files(self):
         return self.get_matching_entry(ADDITIONAL_TYPES_COLUMN, PLOT_CSV_MIME, FILE_LOCATION_COLUMN) + \
-               self.get_matching_entry(ADDITIONAL_TYPES_COLUMN, PLOT_TSV_MIME, FILE_LOCATION_COLUMN)
+            self.get_matching_entry(ADDITIONAL_TYPES_COLUMN, PLOT_TSV_MIME, FILE_LOCATION_COLUMN)
 
     def get_manifest_directory(self, file_location):
         return self.get_matching_entry(FILE_LOCATION_COLUMN, file_location, MANIFEST_DIR_COLUMN)
@@ -240,7 +240,7 @@ class ManifestDataFrame(metaclass=Singleton):
             # Check if there's manifest file under same Scaffold File Dir. If yes get data from it.
             # If no manifest file create new manifest file. Add file to the manifest.
             if not manifestDataFrame[manifestDataFrame[MANIFEST_DIR_COLUMN] == manifest_dir].empty:
-                mDF = pd.read_excel(os.path.join(manifest_dir, MANIFEST_FILENAME))
+                mDF = pd.read_excel(os.path.join(manifest_dir, MANIFEST_FILENAME), dtype=str)
                 newRow = pd.concat([mDF, newRow], ignore_index=True)
             newRow.to_excel(os.path.join(manifest_dir, MANIFEST_FILENAME), index=False, header=True)
 
@@ -299,7 +299,7 @@ class ManifestDataFrame(metaclass=Singleton):
         fileDF = self.get_file_dataframe(file_location)
         for index, row in fileDF.iterrows():
             mDF = pd.read_excel(os.path.join(row[MANIFEST_DIR_COLUMN], MANIFEST_FILENAME),
-                                sheet_name=row[SHEET_NAME_COLUMN])
+                                sheet_name=row[SHEET_NAME_COLUMN], dtype=str)
 
             if content and os.path.isabs(content):
                 content = os.path.relpath(content, row[MANIFEST_DIR_COLUMN])
@@ -309,6 +309,7 @@ class ManifestDataFrame(metaclass=Singleton):
             if append:
                 mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name] \
                     = mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name].fillna(content)
+
                 def _append_new_line_separated(x):
                     if x:
                         val = x + "\n" + content if content not in x.split("\n") else x
@@ -320,6 +321,8 @@ class ManifestDataFrame(metaclass=Singleton):
                 result = mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name].apply(_append_new_line_separated)
                 mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name] = result
             else:
+                if content is None:
+                    content = ""
                 mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name] = content
 
             mDF.to_excel(os.path.join(row[MANIFEST_DIR_COLUMN], MANIFEST_FILENAME), sheet_name=row[SHEET_NAME_COLUMN],

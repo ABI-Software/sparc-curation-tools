@@ -8,9 +8,24 @@ from sparc.curation.tools.errors import IncorrectAnnotationError, NotAnnotatedEr
 from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN, FILENAME_COLUMN, ADDITIONAL_TYPES_COLUMN, \
     SCAFFOLD_META_MIME, SCAFFOLD_VIEW_MIME, \
     SCAFFOLD_THUMBNAIL_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN, MANIFEST_DIR_COLUMN, \
-    OLD_SCAFFOLD_MIMES, MIMETYPE_TO_PARENT_FILETYPE_MAP, MIMETYPE_TO_FILETYPE_MAP
+    OLD_SCAFFOLD_MIMES, MIMETYPE_TO_PARENT_FILETYPE_MAP, MIMETYPE_TO_FILETYPE_MAP, STL_MODEL_MIME, VTK_MODEL_MIME
 from sparc.curation.tools.helpers.file_helper import OnDiskFiles
 from sparc.curation.tools.helpers.manifest_helper import ManifestDataFrame
+
+
+def fix_error(error):
+    # Check files write permission
+    ManifestDataFrame().check_directory_write_permission(error.get_location())
+
+    # Correct old annotation first, then incorrect annotation, and lastly no annotation.
+    if isinstance(error, OldAnnotationError) or isinstance(error, IncorrectAnnotationError):
+        ManifestDataFrame().update_additional_type(error.get_location(), None)
+    elif isinstance(error, NotAnnotatedError):
+        ManifestDataFrame().update_additional_type(error.get_location(), error.get_mime())
+    elif isinstance(error, IncorrectDerivedFromError):
+        ErrorManager().update_derived_from(error.get_location(), error.get_mime(), error.get_target())
+    elif isinstance(error, IncorrectSourceOfError):
+        ErrorManager().update_source_of(error.get_location(), error.get_mime(), error.get_target(), error.get_replace())
 
 
 class ErrorManager(metaclass=Singleton):
@@ -25,9 +40,12 @@ class ErrorManager(metaclass=Singleton):
         self.on_disk_metadata_files = None
         self.on_disk_view_files = None
         self.on_disk_thumbnail_files = None
+        self.on_disk_plot_thumbnail_files = None
+        self._on_disk_alt_forms_files = None
         self.manifest_metadata_files = None
         self.manifest_view_files = None
         self.manifest_thumbnail_files = None
+        self._manifest_alt_forms_files = None
         self.on_disk_context_info_files = None
 
         self.update_content()
@@ -39,6 +57,7 @@ class ErrorManager(metaclass=Singleton):
         self.on_disk_metadata_files = self.on_disk.get_metadata_files()
         self.on_disk_view_files = self.on_disk.get_view_files()
         self.on_disk_thumbnail_files = self.on_disk.get_thumbnail_files()
+        self._on_disk_alt_forms_files = self.on_disk.get_alt_forms_files()
         self.on_disk_plot_thumbnail_files = self.on_disk.get_plot_thumbnails()
         self.on_disk_context_info_files = self.on_disk.get_context_info_files()
 
@@ -49,6 +68,10 @@ class ErrorManager(metaclass=Singleton):
         self.manifest_thumbnail_files = self.manifest.get_matching_entry(ADDITIONAL_TYPES_COLUMN,
                                                                          SCAFFOLD_THUMBNAIL_MIME,
                                                                          FILE_LOCATION_COLUMN)
+        self._manifest_alt_forms_files = {
+            STL_MODEL_MIME: self.manifest.get_matching_entry(ADDITIONAL_TYPES_COLUMN, STL_MODEL_MIME, FILE_LOCATION_COLUMN),
+            VTK_MODEL_MIME: self.manifest.get_matching_entry(ADDITIONAL_TYPES_COLUMN, VTK_MODEL_MIME, FILE_LOCATION_COLUMN),
+        }
 
     # === Find Errors ===
 
@@ -92,6 +115,11 @@ class ErrorManager(metaclass=Singleton):
         # for i in on_disk_thumbnail_files:
         #     if i not in manifest_thumbnail_files:
         #         errors.append(NotAnnotatedError(i, SCAFFOLD_THUMBNAIL_MIME))
+
+        for mime_type in [STL_MODEL_MIME, VTK_MODEL_MIME]:
+            for i in self._on_disk_alt_forms_files[mime_type]:
+                if i not in self._manifest_alt_forms_files[mime_type]:
+                    errors.append(NotAnnotatedError(i, mime_type))
 
         return errors
 
@@ -167,6 +195,11 @@ class ErrorManager(metaclass=Singleton):
             SCAFFOLD_THUMBNAIL_MIME)
         errors.extend(thumbnail_derived_from_errors)
 
+        for mime_type in [STL_MODEL_MIME, VTK_MODEL_MIME]:
+            alt_forms_derived_from_errors = self._process_incorrect_derived_from(
+                self._on_disk_alt_forms_files[mime_type], self.on_disk_view_files, self._manifest_alt_forms_files[mime_type], mime_type)
+            errors.extend(alt_forms_derived_from_errors)
+
         return errors
 
     def _process_incorrect_source_of(self, on_disk_files, mimetype, on_disk_child_files):
@@ -196,8 +229,8 @@ class ErrorManager(metaclass=Singleton):
                         else:
                             corrected_source_of_entries = source_of_entries[:] + on_disk_child_files
                             corrected_source_of_entries.remove(source_of)
-                            errors.append(IncorrectSourceOfError(on_disk_file, mimetype, corrected_source_of_entries))
-                else:
+                            errors.append(IncorrectSourceOfError(on_disk_file, mimetype, corrected_source_of_entries, replace=True))
+                elif on_disk_child_files:
                     errors.append(IncorrectSourceOfError(on_disk_file, mimetype, on_disk_child_files))
 
         if len(errors) == 0:
@@ -205,12 +238,11 @@ class ErrorManager(metaclass=Singleton):
                 derived_from = self.manifest.get_derived_from(on_disk_file)
                 for derived_from_entry in derived_from:
                     if not pd.isna(derived_from_entry):
-                        on_disk_dervied_from = self.manifest.get_matching_entry(FILENAME_COLUMN, derived_from_entry, FILE_LOCATION_COLUMN)
-                        derived_from_source_of = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, on_disk_dervied_from[0], SOURCE_OF_COLUMN)
+                        on_disk_derived_from = self.manifest.get_matching_entry(FILENAME_COLUMN, derived_from_entry, FILE_LOCATION_COLUMN)
+                        derived_from_source_of = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, on_disk_derived_from[0], SOURCE_OF_COLUMN)
                         derived_from_filename = self.manifest.get_filename(on_disk_file)
-                        if not derived_from_source_of or derived_from_filename[0] not in derived_from_source_of[0].split('\n'):
-                            errors.append(IncorrectSourceOfError(on_disk_dervied_from[0], mimetype, on_disk_child_files))
-
+                        if not derived_from_source_of or derived_from_filename[0] not in derived_from_source_of[0].split('\n') and on_disk_child_files:
+                            errors.append(IncorrectSourceOfError(on_disk_derived_from[0], mimetype, on_disk_child_files))
 
         return errors
 
@@ -229,6 +261,11 @@ class ErrorManager(metaclass=Singleton):
 
         view_source_of_errors = self._process_incorrect_source_of(self.on_disk_view_files, SCAFFOLD_VIEW_MIME, self.on_disk_thumbnail_files)
         errors.extend(view_source_of_errors)
+
+        for mime_type in [STL_MODEL_MIME, VTK_MODEL_MIME]:
+            alt_forms_derived_from_errors = self._process_incorrect_source_of(
+                self.on_disk_view_files, SCAFFOLD_VIEW_MIME, self._on_disk_alt_forms_files[mime_type])
+            errors.extend(alt_forms_derived_from_errors)
 
         return errors
 
@@ -262,7 +299,9 @@ class ErrorManager(metaclass=Singleton):
                     values = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, source_of, DERIVED_FROM_COLUMN)
                     mimetypes = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, source_of,
                                                                  ADDITIONAL_TYPES_COLUMN)
-                    if mimetypes[0] != SCAFFOLD_THUMBNAIL_MIME:
+                    if mimetypes[0] in [STL_MODEL_MIME, VTK_MODEL_MIME]:
+                        pass
+                    elif mimetypes[0] != SCAFFOLD_THUMBNAIL_MIME:
                         errors.append(NotAnnotatedError(source_of, SCAFFOLD_THUMBNAIL_MIME))
 
                     if not values[0]:
@@ -300,24 +339,14 @@ class ErrorManager(metaclass=Singleton):
 
         elif mime == SCAFFOLD_THUMBNAIL_MIME:
             # If the MIME type is SCAFFOLD_THUMBNAIL_MIME, find the best matching target filename
-            source_filenames = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, file_location, FILENAME_COLUMN)
-            source_filename = source_filenames[0]
-            best_match = -1
-            for t in target:
-                target_manifest = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, t, MANIFEST_DIR_COLUMN)
-                if source_manifest == target_manifest:
-                    matching_entries = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN)
-                    match_rating = [calculate_match(tt, source_filename) for tt in matching_entries]
-                    max_value = max(match_rating)
-                    max_index = match_rating.index(max_value)
-                    if max_value > best_match:
-                        best_match = max_value
-                        target_filenames = [matching_entries[max_index]]
+            target_filenames = self._find_best_match(file_location, source_manifest, target)
+        elif mime in [STL_MODEL_MIME, VTK_MODEL_MIME]:
+            target_filenames = self._find_best_match(file_location, source_manifest, target)
 
         # Update the 'Derived From' column content with the target filenames
         self.manifest.update_column_content(file_location, DERIVED_FROM_COLUMN, "\n".join(target_filenames))
 
-    def update_source_of(self, file_location, mime, target):
+    def update_source_of(self, file_location, mime, target, replace):
         """
         Update the 'Source Of' column in the manifest data frame for the given file location.
     
@@ -331,48 +360,47 @@ class ErrorManager(metaclass=Singleton):
         source_manifest = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, file_location, MANIFEST_DIR_COLUMN)
 
         # List to store target filenames
-        target_filenames = []
+        target_filenames = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, file_location, SOURCE_OF_COLUMN)
+        target_filenames = [tt for tt in target_filenames if str(tt) != "nan"]
 
-        if mime == SCAFFOLD_META_MIME:
+        if mime in [SCAFFOLD_META_MIME, SCAFFOLD_VIEW_MIME, STL_MODEL_MIME, VTK_MODEL_MIME]:
             # If the MIME type is SCAFFOLD_META_MIME, find the matching target filenames
+            filtered_targets = []
             for t in target:
                 target_manifest = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, t, MANIFEST_DIR_COLUMN)
                 if source_manifest == target_manifest:
-                    target_filenames.extend(
-                        self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN))
+                    t_mime = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, t, ADDITIONAL_TYPES_COLUMN)
+                    if t_mime and t_mime[0] == SCAFFOLD_THUMBNAIL_MIME:
+                        filtered_targets.append(t)
+                    else:
+                        if replace:
+                            target_filenames = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN)
+                        else:
+                            target_filenames.extend(
+                                self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN))
 
-        elif mime == SCAFFOLD_VIEW_MIME:
-            # If the MIME type is SCAFFOLD_VIEW_MIME, find the best matching target filename
-            source_filenames = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, file_location, FILENAME_COLUMN)
-            source_filename = source_filenames[0]
-            best_match = -1
-            for t in target:
-                target_manifest = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, t, MANIFEST_DIR_COLUMN)
-                if source_manifest == target_manifest:
-                    matching_entries = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN)
-                    match_rating = [calculate_match(tt, source_filename) for tt in matching_entries]
-                    max_value = max(match_rating)
-                    max_index = match_rating.index(max_value)
-                    if max_value > best_match:
-                        best_match = max_value
-                        target_filenames = [matching_entries[max_index]]
+            target_filenames.extend(self._find_best_match(file_location, source_manifest, filtered_targets))
 
         # Update the 'Source Of' column content with the target filenames
         self.manifest.update_column_content(file_location, SOURCE_OF_COLUMN, "\n".join(target_filenames))
 
-    def fix_error(self, error):
-        # Check files write permission
-        ManifestDataFrame().check_directory_write_permission(error.get_location())
+    def _find_best_match(self, file_location, source_manifest, target):
+        target_filenames = []
+        source_filenames = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, file_location, FILENAME_COLUMN)
+        source_filename = source_filenames[0]
+        best_match = -1
+        for t in target:
+            target_manifest = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, t, MANIFEST_DIR_COLUMN)
+            if source_manifest == target_manifest:
+                matching_entries = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN)
+                match_rating = [calculate_match(tt, source_filename) for tt in matching_entries]
+                max_value = max(match_rating)
+                max_index = match_rating.index(max_value)
+                if max_value > best_match:
+                    best_match = max_value
+                    target_filenames = [matching_entries[max_index]]
 
-        # Correct old annotation first, then incorrect annotation, and lastly no annotation.
-        if isinstance(error, OldAnnotationError) or isinstance(error, IncorrectAnnotationError):
-            ManifestDataFrame().update_additional_type(error.get_location(), None)
-        elif isinstance(error, NotAnnotatedError):
-            ManifestDataFrame().update_additional_type(error.get_location(), error.get_mime())
-        elif isinstance(error, IncorrectDerivedFromError):
-            ErrorManager().update_derived_from(error.get_location(), error.get_mime(), error.get_target())
-        elif isinstance(error, IncorrectSourceOfError):
-            ErrorManager().update_source_of(error.get_location(), error.get_mime(), error.get_target())
+        return target_filenames
 
 
 def calculate_match(item1, item2):

@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 
+from sparc.curation.tools.definitions import STL_MODEL_MIME, VTK_MODEL_MIME
 from sparc.curation.tools.helpers.base import Singleton
 from sparc.curation.tools.utilities import convert_to_bytes
 from sparc.curation.tools.plot_utilities import generate_dataframe_from_txt
@@ -279,6 +280,35 @@ def search_for_image_files(dataset_dir):
     return image_file_paths
 
 
+def _add_file(mime_type_list, potential_file, thumbnail_file):
+    common_path = os.path.commonprefix([potential_file, thumbnail_file])
+    if not os.path.isdir(common_path):
+        common_prefix = os.path.basename(common_path)
+        thumbnail_file_name = os.path.basename(thumbnail_file)
+        potential_file_name = os.path.basename(potential_file)
+        if thumbnail_file_name.startswith(common_prefix) and potential_file_name.startswith(common_prefix):
+            mime_type_list.append(potential_file)
+
+
+def _filter_alt_forms_by_thumbnail(thumbnail_files):
+    alt_forms_files = {
+        STL_MODEL_MIME: [],
+        VTK_MODEL_MIME: [],
+    }
+    for thumbnail_file in thumbnail_files:
+        target_dir = os.path.dirname(thumbnail_file)
+        files = os.listdir(os.path.dirname(thumbnail_file))
+        for f in files:
+            potential_file = os.path.join(target_dir, f)
+            if os.path.isfile(potential_file) and potential_file is not thumbnail_file:
+                if potential_file.endswith(".vtk"):
+                    _add_file(alt_forms_files[VTK_MODEL_MIME], potential_file, thumbnail_file)
+                if potential_file.endswith(".stl"):
+                    _add_file(alt_forms_files[STL_MODEL_MIME], potential_file, thumbnail_file)
+
+    return alt_forms_files
+
+
 def filter_thumbnail_files_by_parent(image_file_paths, parent_files):
     """
     Filter a list of image file paths to include only those whose in the same folder
@@ -364,24 +394,13 @@ class OnDiskFiles(metaclass=Singleton):
     """
     Singleton class for managing on-disk files.
 
-    This class provides methods for setting and retrieving metadata, view, thumbnail, and plot files from a dataset directory.
-    It also provides a method for setting up the dataset by searching for the required files.
+    This class provides methods for setting and retrieving metadata, view, thumbnail, alternative forms,
+    and plot files from a dataset directory. It also provides a method for setting up the
+    dataset by searching for the required files.
 
     Attributes:
         _plot_files (dict): Dictionary containing lists of CSV and TSV plot file paths.
         _scaffold_files (dict): Dictionary containing lists of metadata, view, and thumbnail file paths.
-
-    Methods:
-        setup_dataset(dataset_dir, max_size): Set up the dataset by searching for the required files.
-        set_metadata_files(files, metadata_views): Set the metadata files and metadata views.
-        get_metadata_files(): Get the metadata file paths.
-        set_view_files(files): Set the view files.
-        get_view_files(): Get the view file paths.
-        set_thumbnail_files(files): Set the thumbnail files.
-        get_thumbnail_files(): Get the thumbnail file paths.
-        get_plot_files(): Get the plot file paths.
-        get_plot_thumbnails(): Get the plot thumbnail paths.
-        get_all_image_files(): Get all the image file paths in the dataset.
     """
 
     _dataset_dir = None
@@ -394,6 +413,7 @@ class OnDiskFiles(metaclass=Singleton):
         'metadata': [],
         'view': [],
         'thumbnail': [],
+        'alt_forms': {},
     }
     _context_info_files = []
 
@@ -417,13 +437,14 @@ class OnDiskFiles(metaclass=Singleton):
         metadata_file, metadata_views = search_for_metadata_files(dataset_dir, max_size)
         self.set_metadata_files(metadata_file, metadata_views)
 
-        self._scaffold_files['view'] = search_for_view_files(dataset_dir, max_size)
-        self._scaffold_files['thumbnail'] = filter_thumbnail_files_by_parent(self._image_paths,
-                                                                             self._scaffold_files['view'])
+        self._scaffold_files["view"] = search_for_view_files(dataset_dir, max_size)
+        self._scaffold_files["thumbnail"] = filter_thumbnail_files_by_parent(self._image_paths,
+                                                                             self._scaffold_files["view"])
+        self._scaffold_files["alt_forms"] = _filter_alt_forms_by_thumbnail(self._scaffold_files["thumbnail"])
 
         self._plot_files["plot"] = search_for_plot_files(self._dataset_dir)
         self._plot_files["thumbnail"] = filter_thumbnail_files_by_parent(self._image_paths,
-                                                                         self._plot_files['plot'])
+                                                                         self._plot_files["plot"])
 
         self._context_info_files = search_for_context_data_files(self._dataset_dir, convert_to_bytes("2MiB"))
 
@@ -459,6 +480,15 @@ class OnDiskFiles(metaclass=Singleton):
             list: List of view file paths.
         """
         return [str(i) for i in self._scaffold_files['view']]
+
+    def get_alt_forms_files(self):
+        """
+        Get the alternative forms file paths.
+
+        Returns:
+            list: List of alternative forms file paths.
+        """
+        return self._scaffold_files['alt_forms']
 
     def get_thumbnail_files(self):
         """
