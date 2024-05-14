@@ -45,13 +45,22 @@ def update_column_content(subject_text, predicate_text, object_value, append):
     ManifestDataFrame().update_column_content(subject_text, predicate_text, object_value, append)
 
 
+def _create_non_empty_list(input_list):
+    output_list = []
+    if isinstance(input_list, list) and len(input_list):
+        if not isinstance(input_list[0], float):
+            output_list = list(filter(None, input_list[0].split('\n')))
+
+    return output_list
+
+
 def get_annotated_scaffold_dictionary():
     """
     Build and return a scaffold dictionary based on scaffold annotation in manifest files.
     The annotated scaffold dictionary has the following structure:
     {
         metadata_filename: {
-            view_file: [thumbnail_filenames]
+            view_file: [thumbnail_filename, vtk_filename, stl_filename, ...]
         }
     }
 
@@ -69,27 +78,24 @@ def get_annotated_scaffold_dictionary():
         manifest_dir = manifest.get_manifest_directory(metadata_file)[0]
 
         # Get a list of view filenames associated with the metadata
-        view_filenames = manifest.get_source_of(metadata_file)
+        metadata_source_of = manifest.get_source_of(metadata_file)
         # Create an empty dictionary to store view and thumbnail information for this metadata
         metadata_entry = {}
 
         # View filenames can have multiple lines separated by a newline.
-        if isinstance(view_filenames, list) and len(view_filenames):
-            if not isinstance(view_filenames[0], float):
-                view_filenames = list(filter(None, view_filenames[0].split('\n')))
+        filtered_metadata_source_of = _create_non_empty_list(metadata_source_of)
 
-        for view in view_filenames:
+        for view in filtered_metadata_source_of:
             view_filename = os.path.join(manifest_dir, view)
 
             # Get a list of thumbnail filenames associated with the view
-            thumbnail_filenames = manifest.get_source_of(view_filename)
+            view_source_of = manifest.get_source_of(view_filename)
 
-            # Create a list to store thumbnail information for this view
-            view_entry = [os.path.join(manifest_dir, thumbnail) for thumbnail in thumbnail_filenames
-                          if not isinstance(thumbnail, float)]
+            # Create a list to store thumbnail, etc. information for this view
+            view_value = [os.path.join(manifest_dir, e) for e in _create_non_empty_list(view_source_of)]
 
             # Add the view entry to the metadata entry
-            metadata_entry[view_filename] = view_entry
+            metadata_entry[view_filename] = view_value
 
         # Add the metadata entry to the annotated scaffold dictionary
         annotated_scaffold_dictionary[metadata_file] = metadata_entry
