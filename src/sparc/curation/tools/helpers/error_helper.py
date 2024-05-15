@@ -8,7 +8,7 @@ from sparc.curation.tools.errors import IncorrectAnnotationError, NotAnnotatedEr
 from sparc.curation.tools.definitions import FILE_LOCATION_COLUMN, FILENAME_COLUMN, ADDITIONAL_TYPES_COLUMN, \
     SCAFFOLD_META_MIME, SCAFFOLD_VIEW_MIME, \
     SCAFFOLD_THUMBNAIL_MIME, DERIVED_FROM_COLUMN, SOURCE_OF_COLUMN, MANIFEST_DIR_COLUMN, \
-    OLD_SCAFFOLD_MIMES, MIMETYPE_TO_PARENT_FILETYPE_MAP, MIMETYPE_TO_FILETYPE_MAP, STL_MODEL_MIME, VTK_MODEL_MIME
+    OLD_SCAFFOLD_MIMES, MIMETYPE_TO_PARENT_FILETYPE_MAP, MIMETYPE_TO_FILETYPE_MAP, STL_MODEL_MIME, VTK_MODEL_MIME, SCAFFOLD_INFO_MIME
 from sparc.curation.tools.helpers.file_helper import OnDiskFiles
 from sparc.curation.tools.helpers.manifest_helper import ManifestDataFrame
 
@@ -200,6 +200,8 @@ class ErrorManager(metaclass=Singleton):
                 self._on_disk_alt_forms_files[mime_type], self.on_disk_view_files, self._manifest_alt_forms_files[mime_type], mime_type)
             errors.extend(alt_forms_derived_from_errors)
 
+        errors.extend(self._process_metadata_organ_scaffold(derived_from=True))
+
         return errors
 
     def _process_incorrect_source_of(self, on_disk_files, mimetype, on_disk_child_files):
@@ -246,6 +248,27 @@ class ErrorManager(metaclass=Singleton):
 
         return errors
 
+    def _get_single_value(self, column_heading, value, out_column_heading):
+        query_result = self.manifest.get_matching_entry(column_heading, value, out_column_heading)
+        if len(query_result) == 1:
+            return query_result[0]
+
+        return None
+
+    def _process_metadata_organ_scaffold(self, derived_from=False):
+        error = []
+        scaffold_info_location = self._get_single_value(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_INFO_MIME, FILE_LOCATION_COLUMN)
+        metadata_location = self._get_single_value(ADDITIONAL_TYPES_COLUMN, SCAFFOLD_META_MIME, FILE_LOCATION_COLUMN)
+        if scaffold_info_location and metadata_location:
+            scaffold_info_source_of = self._get_single_value(FILE_LOCATION_COLUMN, scaffold_info_location, SOURCE_OF_COLUMN)
+            metadata_derived_from = self._get_single_value(FILE_LOCATION_COLUMN, metadata_location, DERIVED_FROM_COLUMN)
+            if str(scaffold_info_source_of) == "nan" and not derived_from:
+                error.append(IncorrectSourceOfError(scaffold_info_location, SCAFFOLD_INFO_MIME, [metadata_location]))
+            elif str(metadata_derived_from) == "nan" and derived_from:
+                error.append(IncorrectDerivedFromError(metadata_location, SCAFFOLD_META_MIME, [scaffold_info_location]))
+
+        return error
+
     def get_incorrect_source_of(self):
         """
         Get errors for incorrect source of relationships in the manifest dataframe.
@@ -266,6 +289,9 @@ class ErrorManager(metaclass=Singleton):
             alt_forms_derived_from_errors = self._process_incorrect_source_of(
                 self.on_disk_view_files, SCAFFOLD_VIEW_MIME, self._on_disk_alt_forms_files[mime_type])
             errors.extend(alt_forms_derived_from_errors)
+
+        # Look for link between metadata file and application/x.vnd.abi.organ-scaffold-info+json
+        errors.extend(self._process_metadata_organ_scaffold())
 
         return errors
 
@@ -330,18 +356,15 @@ class ErrorManager(metaclass=Singleton):
         target_filenames = []
 
         if mime == SCAFFOLD_VIEW_MIME:
-            # If the MIME type is SCAFFOLD_VIEW_MIME, find the matching target filenames
             for t in target:
                 target_manifest = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, t, MANIFEST_DIR_COLUMN)
                 if source_manifest == target_manifest:
                     target_filenames.extend(
                         self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN))
-
-        elif mime == SCAFFOLD_THUMBNAIL_MIME:
-            # If the MIME type is SCAFFOLD_THUMBNAIL_MIME, find the best matching target filename
+        elif mime in [SCAFFOLD_THUMBNAIL_MIME, STL_MODEL_MIME, VTK_MODEL_MIME]:
             target_filenames = self._find_best_match(file_location, source_manifest, target)
-        elif mime in [STL_MODEL_MIME, VTK_MODEL_MIME]:
-            target_filenames = self._find_best_match(file_location, source_manifest, target)
+        elif mime in [SCAFFOLD_META_MIME]:
+            target_filenames = target
 
         # Update the 'Derived From' column content with the target filenames
         self.manifest.update_column_content(file_location, DERIVED_FROM_COLUMN, "\n".join(target_filenames))
@@ -354,6 +377,7 @@ class ErrorManager(metaclass=Singleton):
             file_location (str): The file location to update.
             mime (str): The MIME type of the file.
             target (list): List of target file locations.
+            replace (bool): True if the contents is to be replaced.
     
         """
         # Get the source manifest entry for the given file location
@@ -373,13 +397,15 @@ class ErrorManager(metaclass=Singleton):
                     if t_mime and t_mime[0] == SCAFFOLD_THUMBNAIL_MIME:
                         filtered_targets.append(t)
                     else:
+                        matched_entries = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN)
                         if replace:
-                            target_filenames = self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN)
+                            target_filenames = matched_entries
                         else:
-                            target_filenames.extend(
-                                self.manifest.get_matching_entry(FILE_LOCATION_COLUMN, t, FILENAME_COLUMN))
+                            target_filenames.extend(matched_entries)
 
             target_filenames.extend(self._find_best_match(file_location, source_manifest, filtered_targets))
+        elif mime in [SCAFFOLD_INFO_MIME]:
+            target_filenames = target
 
         # Update the 'Source Of' column content with the target filenames
         self.manifest.update_column_content(file_location, SOURCE_OF_COLUMN, "\n".join(target_filenames))

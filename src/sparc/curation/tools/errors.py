@@ -246,6 +246,7 @@ class BadManifestError(Exception):
     """
     pass
 
+
 class DatasetNotDefinedError(AnnotationError):
     """
     Class for errors where the dataset for annotations has not
