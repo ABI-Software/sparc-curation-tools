@@ -1,4 +1,5 @@
 import os
+import pathlib
 from pathlib import Path
 import pandas as pd
 
@@ -223,7 +224,7 @@ class ManifestDataFrame(metaclass=Singleton):
         """
         manifestDataFrame = self._manifestDataFrame
         if manifest_dir:
-            file_name = os.path.relpath(file_location, manifest_dir)
+            file_name = pathlib.PureWindowsPath(os.path.relpath(file_location, manifest_dir)).as_posix()
         else:
             manifest_dir = os.path.dirname(file_location)
             if manifestDataFrame.empty:
@@ -302,7 +303,7 @@ class ManifestDataFrame(metaclass=Singleton):
                                 sheet_name=row[SHEET_NAME_COLUMN], dtype=str)
 
             if content and os.path.isabs(content):
-                content = os.path.relpath(content, row[MANIFEST_DIR_COLUMN])
+                content = pathlib.PureWindowsPath(os.path.relpath(content, row[MANIFEST_DIR_COLUMN])).as_posix()
             if column_name not in mDF.columns:
                 mDF[column_name] = ""
 
