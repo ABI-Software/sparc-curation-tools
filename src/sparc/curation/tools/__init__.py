@@ -1,6 +1,8 @@
 import os
 import kaleido
 
+from importlib import reload
+
 __version__ = "0.7.3"
 
 if kaleido.__version__ == "0.2.1":
@@ -16,3 +18,5 @@ if kaleido.__version__ == "0.2.1":
 
         with open(base_file, 'w') as f:
             f.write(''.join(contents))
+
+        kaleido = reload(kaleido)
