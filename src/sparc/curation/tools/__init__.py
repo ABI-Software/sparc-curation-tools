@@ -3,7 +3,7 @@ import kaleido
 
 from importlib import reload
 
-__version__ = "0.7.3"
+__version__ = "0.7.4"
 
 if kaleido.__version__ == "0.2.1":
     kaleido_dir = os.path.dirname(os.path.abspath(kaleido.__file__))
