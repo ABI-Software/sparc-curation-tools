@@ -105,9 +105,9 @@ class ScaffoldAnnotationTestCase(unittest.TestCase):
 
         self.assertEqual(0, len(remaining_errors))
         self.assertEqual('rat_brainstem_Layout1_view.json', df['filename'][1])
-        self.assertEqual('rat_brainstem_Layout1_thumbnail.jpeg', df['isSourceOf'][1])
+        self.assertEqual('rat_brainstem_Layout1_thumbnail.jpeg', df['IsSourceOf'][1])
         self.assertEqual('rat_brainstem_Layout2_view.json', df['filename'][4])
-        self.assertEqual('rat_brainstem_Layout2_thumbnail.jpeg', df['isSourceOf'][4])
+        self.assertEqual('rat_brainstem_Layout2_thumbnail.jpeg', df['IsSourceOf'][4])
 
     def test_annotate_bare_multiple_scaffolds(self):
         dulwich_checkout(self._repo, b"origin/no_scaffold_annotations_multiple_scaffolds")

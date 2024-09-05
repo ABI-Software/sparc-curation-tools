@@ -18,13 +18,13 @@ SIZE_NAME = ("B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB", "ZiB", "YiB")
 MANIFEST_FILENAME = 'manifest.xlsx'
 
 ADDITIONAL_TYPES_COLUMN = 'additional types'
-ANATOMICAL_ENTITY_COLUMN = 'isAboutAnatomicalEntity'
-DERIVED_FROM_COLUMN = 'isDerivedFrom'
+ANATOMICAL_ENTITY_COLUMN = 'IsAboutAnatomicalEntity'
+DERIVED_FROM_COLUMN = 'IsDerivedFrom'
 FILE_LOCATION_COLUMN = 'file_location'
 FILENAME_COLUMN = 'filename'
 MANIFEST_DIR_COLUMN = 'manifest_dir'
 SHEET_NAME_COLUMN = 'sheet_name'
-SOURCE_OF_COLUMN = 'isSourceOf'
+SOURCE_OF_COLUMN = 'IsSourceOf'
 SUPPLEMENTAL_JSON_COLUMN = 'Supplemental JSON Metadata'
 
 MIMETYPE_TO_FILETYPE_MAP = {
