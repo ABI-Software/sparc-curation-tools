@@ -112,7 +112,7 @@ class ManifestDataFrame(metaclass=Singleton):
                     if not os.access(manifest_dir, os.W_OK):  # Check if the directory is writable
                         raise AnnotationDirectoryNoWriteAccess(f"Cannot write to directory {manifest_dir}.")
 
-    def _sanitise_is_derived_from(self, column_names):
+    def _sanitise_column_heading(self, column_names, sanitised_heading):
         """
         Sanitize the column names related to 'derived from'.
 
@@ -122,8 +122,8 @@ class ManifestDataFrame(metaclass=Singleton):
         sanitised = False
         bad_column_name = ''
         for column_name in column_names:
-            if column_name.lower() == DERIVED_FROM_COLUMN.lower():
-                if column_name != DERIVED_FROM_COLUMN:
+            if column_name.lower() == sanitised_heading.lower():
+                if column_name != sanitised_heading:
                     bad_column_name = column_name
                 break
 
@@ -132,17 +132,34 @@ class ManifestDataFrame(metaclass=Singleton):
                          self._manifestDataFrame[self._manifestDataFrame[bad_column_name].notnull()].iterrows()]
             unique_manifests = list(set(manifests))
             for manifest_dir in unique_manifests:
-                current_manifest = os.path.join(manifest_dir, MANIFEST_FILENAME)
+                current_manifest = os.path.realpath(os.path.join(manifest_dir, MANIFEST_FILENAME))
                 mDF = pd.read_excel(current_manifest, dtype=str)
-                mDF.rename(columns={bad_column_name: DERIVED_FROM_COLUMN}, inplace=True)
+                mDF.rename(columns={bad_column_name: sanitised_heading}, inplace=True)
                 mDF.to_excel(current_manifest, index=False, header=True)
+                sanitised = True
+
+            if not unique_manifests:
+                manifests_to_sanitise = []
+                for manifest_dir in self._manifestDataFrame[MANIFEST_DIR_COLUMN]:
+                    current_manifest = os.path.realpath(os.path.join(manifest_dir, MANIFEST_FILENAME))
+                    if current_manifest not in manifests_to_sanitise:
+                        manifests_to_sanitise.append(current_manifest)
+
+                for manifest in manifests_to_sanitise:
+                    mDF = pd.read_excel(manifest, dtype=str)
+                    mDF.drop(columns=[bad_column_name], inplace=True)
+                    mDF.to_excel(manifest, index=False, header=True)
+
+                self._manifestDataFrame.drop(columns=[bad_column_name])
                 sanitised = True
 
         return sanitised
 
     def _sanitise_dataframe(self):
         column_names = self._manifestDataFrame.columns
-        sanitised = self._sanitise_is_derived_from(column_names)
+        sanitised = self._sanitise_column_heading(column_names, DERIVED_FROM_COLUMN)
+        sanitised = self._sanitise_column_heading(column_names, SOURCE_OF_COLUMN) or sanitised
+        sanitised = self._sanitise_column_heading(column_names, ANATOMICAL_ENTITY_COLUMN) or sanitised
         return sanitised
 
     # region -----Get-----
@@ -243,7 +260,9 @@ class ManifestDataFrame(metaclass=Singleton):
             if not manifestDataFrame[manifestDataFrame[MANIFEST_DIR_COLUMN] == manifest_dir].empty:
                 mDF = pd.read_excel(os.path.join(manifest_dir, MANIFEST_FILENAME), dtype=str)
                 newRow = pd.concat([mDF, newRow], ignore_index=True)
-            newRow.to_excel(os.path.join(manifest_dir, MANIFEST_FILENAME), index=False, header=True)
+
+            manifest_absolute_path = os.path.realpath(os.path.join(manifest_dir, MANIFEST_FILENAME))
+            newRow.to_excel(manifest_absolute_path, index=False, header=True)
 
             # Re-read manifests to find dataframe for newly added entry.
             self._read_manifests()
@@ -326,7 +345,8 @@ class ManifestDataFrame(metaclass=Singleton):
                     content = ""
                 mDF.loc[mDF[FILENAME_COLUMN] == row[FILENAME_COLUMN], column_name] = content
 
-            mDF.to_excel(os.path.join(row[MANIFEST_DIR_COLUMN], MANIFEST_FILENAME), sheet_name=row[SHEET_NAME_COLUMN],
+            manifest_absolute_path = os.path.realpath(os.path.join(row[MANIFEST_DIR_COLUMN], MANIFEST_FILENAME))
+            mDF.to_excel(manifest_absolute_path, sheet_name=row[SHEET_NAME_COLUMN],
                          index=False, header=True)
 
         self._read_manifests()

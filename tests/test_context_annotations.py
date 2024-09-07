@@ -4,7 +4,6 @@ import os.path
 import unittest
 
 import pandas as pd
-from sparc.curation.tools import context_annotations
 from sparc.curation.tools.context_annotations import annotate_context_info
 from sparc.curation.tools.definitions import SOURCE_OF_COLUMN
 from sparc.curation.tools.helpers.file_helper import OnDiskFiles, search_for_context_data_files
